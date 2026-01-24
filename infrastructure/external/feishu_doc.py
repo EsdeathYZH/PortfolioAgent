@@ -1,13 +1,17 @@
-# feishu_doc.py
 # -*- coding: utf-8 -*-
-import json
+"""
+飞书服务集成
+
+提供飞书云文档管理功能
+"""
+
 import logging
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import lark_oapi as lark
 from lark_oapi.api.docx.v1 import *
 
-from config import get_config
+from shared.config import get_config
 
 logger = logging.getLogger(__name__)
 

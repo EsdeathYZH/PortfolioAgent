@@ -264,7 +264,7 @@ class DataFetcherManager:
           3. BaostockFetcher (Priority 3)
           4. YfinanceFetcher (Priority 4)
         """
-        from config import get_config
+        from shared.config import get_config
 
         from .akshare_fetcher import AkshareFetcher
         from .baostock_fetcher import BaostockFetcher

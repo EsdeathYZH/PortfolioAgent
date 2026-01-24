@@ -18,40 +18,25 @@ project_root = PathLib(__file__).parent.parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from config import get_config
 from core.domain.analysis import AnalysisResult
+from shared.config import get_config
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationService:
     """
-    通知服务（重构版）
+    通知服务
 
     职责：
     1. 生成 Markdown 格式的分析日报
     2. 向所有已配置的渠道推送消息（多渠道并发）
     3. 支持本地保存日报
-
-    暂时保持向后兼容，逐步迁移到新架构
     """
 
     def __init__(self):
         """初始化通知服务"""
-        # 暂时使用原有实现，逐步迁移
-        try:
-            # 尝试导入原有模块
-            from notification import NotificationService as OldNotificationService
-
-            self._old_service = OldNotificationService()
-            self._use_old = True
-            logger.info("使用原有通知服务实现（向后兼容）")
-        except ImportError:
-            self._old_service = None
-            self._use_old = False
-            logger.warning("无法导入原有通知服务，将使用新实现")
-
-        # 初始化新架构的渠道（逐步迁移）
+        # 初始化新架构的渠道
         self._channels = []
         self._init_channels()
 
@@ -185,28 +170,16 @@ class NotificationService:
 
     def is_available(self) -> bool:
         """检查通知服务是否可用"""
-        if self._use_old and self._old_service:
-            return self._old_service.is_available()
         return len(self._channels) > 0
 
     def get_available_channels(self):
         """获取所有已配置的渠道"""
-        if self._use_old and self._old_service:
-            return self._old_service.get_available_channels()
-        if self._use_old and self._old_service:
-            return self._old_service.get_available_channels()
         return [ch.name for ch in self._channels if ch.is_configured]
 
     def generate_daily_report(self, results: List[AnalysisResult], report_date: Optional[str] = None) -> str:
         """
         生成 Markdown 格式的日报（详细版）
-
-        暂时使用原有实现
         """
-        if self._use_old and self._old_service:
-            return self._old_service.generate_daily_report(results, report_date)
-
-        # TODO: 使用新的formatters实现
         from .formatters.daily_report import DailyReportFormatter
 
         formatter = DailyReportFormatter()
@@ -215,13 +188,7 @@ class NotificationService:
     def generate_dashboard_report(self, results: List[AnalysisResult], report_date: Optional[str] = None) -> str:
         """
         生成决策仪表盘格式的日报
-
-        暂时使用原有实现
         """
-        if self._use_old and self._old_service:
-            return self._old_service.generate_dashboard_report(results, report_date)
-
-        # TODO: 使用新的formatters实现
         from .formatters.dashboard import DashboardFormatter
 
         formatter = DashboardFormatter()
@@ -230,13 +197,7 @@ class NotificationService:
     def generate_single_stock_report(self, result: AnalysisResult) -> str:
         """
         生成单只股票的分析报告
-
-        暂时使用原有实现
         """
-        if self._use_old and self._old_service:
-            return self._old_service.generate_single_stock_report(result)
-
-        # TODO: 使用新的formatters实现
         from .formatters.single_stock import SingleStockFormatter
 
         formatter = SingleStockFormatter()
@@ -245,13 +206,7 @@ class NotificationService:
     def send(self, content: str) -> bool:
         """
         统一发送接口 - 向所有已配置的渠道发送
-
-        暂时使用原有实现，逐步迁移到新架构
         """
-        if self._use_old and self._old_service:
-            return self._old_service.send(content)
-
-        # 使用新架构的渠道
         success_count = 0
         for channel in self._channels:
             try:

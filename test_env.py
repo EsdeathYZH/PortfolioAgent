@@ -51,7 +51,7 @@ def test_config():
     """测试配置加载"""
     print_header("1. 配置加载测试")
 
-    from config import get_config
+    from shared.config import get_config
 
     config = get_config()
 
@@ -91,7 +91,7 @@ def view_database():
 
     from sqlalchemy import text
 
-    from storage import get_db
+    from infrastructure.data import get_db
 
     db = get_db()
 
@@ -223,8 +223,8 @@ def test_llm():
 
     import time
 
-    from analyzer import GeminiAnalyzer
-    from config import get_config
+    from infrastructure.ai import GeminiAnalyzer
+    from shared.config import get_config
 
     config = get_config()
 
@@ -334,8 +334,8 @@ def test_notification():
     """测试通知推送"""
     print_header("5. 通知推送测试")
 
-    from config import get_config
-    from notification import NotificationService
+    from core.services.notification import NotificationService
+    from shared.config import get_config
 
     config = get_config()
     service = NotificationService()
@@ -425,7 +425,7 @@ def query_stock_data(stock_code: str, days: int = 10):
 
     from sqlalchemy import text
 
-    from storage import get_db
+    from infrastructure.data import get_db
 
     db = get_db()
 

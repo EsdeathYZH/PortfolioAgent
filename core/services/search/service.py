@@ -17,8 +17,7 @@ project_root = Path(__file__).parent.parent.parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from search_service import SearchResponse
-
+from .models import SearchResponse
 from .providers.base import BaseSearchProvider
 from .providers.bocha import BochaSearchProvider
 from .providers.serpapi import SerpAPISearchProvider
@@ -320,7 +319,7 @@ def get_search_service() -> SearchService:
     global _search_service
 
     if _search_service is None:
-        from config import get_config
+        from shared.config import get_config
 
         config = get_config()
         _search_service = SearchService(

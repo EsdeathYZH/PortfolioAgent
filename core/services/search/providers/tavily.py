@@ -8,16 +8,9 @@ Tavily搜索引擎提供者
 import logging
 
 # 导入基类和数据模型
-import sys
-from pathlib import Path
 from typing import List
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-from search_service import SearchResponse, SearchResult
-
+from ..models import SearchResponse, SearchResult
 from .base import BaseSearchProvider
 
 logger = logging.getLogger(__name__)

@@ -8,18 +8,12 @@
 import logging
 
 # 导入数据模型
-import sys
 import time
 from abc import ABC, abstractmethod
 from itertools import cycle
-from pathlib import Path
 from typing import Dict, List, Optional
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-from search_service import SearchResponse
+from ..models import SearchResponse
 
 logger = logging.getLogger(__name__)
 

@@ -36,16 +36,13 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from analyzer import GeminiAnalyzer
-from config import Config, get_config
-from core.services.analysis import StockAnalysisPipeline
-from feishu_doc import FeishuDocManager
-from market_analyzer import MarketAnalyzer
-from notification import NotificationService
-
-# 导入新的模块
+from core.services.analysis import MarketAnalyzer, StockAnalysisPipeline
+from core.services.notification import NotificationService
+from core.services.search import SearchService
+from infrastructure.ai import GeminiAnalyzer
+from infrastructure.external import FeishuDocManager
 from presentation.cli import parse_arguments, setup_logging
-from search_service import SearchService
+from shared.config import Config, get_config
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +208,7 @@ def main() -> int:
 
     if start_webui:
         try:
-            from webui import run_server_in_thread
+            from web import run_server_in_thread
 
             run_server_in_thread(host=config.webui_host, port=config.webui_port)
         except Exception as e:
@@ -258,7 +255,7 @@ def main() -> int:
             logger.info("模式: 定时任务")
             logger.info(f"每日执行时间: {config.schedule_time}")
 
-            from scheduler import run_with_schedule
+            from presentation.scheduler import run_with_schedule
 
             def scheduled_task():
                 run_full_analysis(config, args, stock_codes)

@@ -22,7 +22,7 @@ from typing import Optional, Tuple
 import pandas as pd
 from tenacity import before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from config import get_config
+from shared.config import get_config
 
 from .base import STANDARD_COLUMNS, BaseFetcher, DataFetchError, RateLimitError
 

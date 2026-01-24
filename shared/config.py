@@ -160,7 +160,7 @@ class Config:
         3. 代码中的默认值
         """
         # 加载项目根目录下的 .env 文件
-        env_path = Path(__file__).parent / ".env"
+        env_path = Path(__file__).parent.parent / ".env"
         load_dotenv(dotenv_path=env_path)
 
         # 解析自选股列表（逗号分隔）
@@ -243,7 +243,7 @@ class Config:
         2. 系统环境变量（GitHub Actions、Docker） - 启动时固定，运行中不变
         """
         # 若 .env 中配置了 STOCK_LIST，则以 .env 为准；否则回退到系统环境变量
-        env_path = Path(__file__).parent / ".env"
+        env_path = Path(__file__).parent.parent / ".env"
         stock_list_str = ""
         if env_path.exists():
             env_values = dotenv_values(env_path)

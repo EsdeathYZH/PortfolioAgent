@@ -23,7 +23,7 @@ from datetime import datetime
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Dict
 
-from enums import ReportType
+from shared.enums import ReportType
 from web.services import get_analysis_service, get_config_service
 from web.templates import render_config_page
 

@@ -19,15 +19,16 @@ project_root = Path(__file__).parent.parent.parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from config import Config, get_config
 from core.domain.analysis import AnalysisResult
+from core.services.notification import NotificationService
+from core.services.notification.channels.base import NotificationChannel
+from core.services.search import SearchService
 from data_provider import DataFetcherManager
 from data_provider.akshare_fetcher import AkshareFetcher, ChipDistribution, RealtimeQuote
-from enums import ReportType
 from infrastructure.ai import STOCK_NAME_MAP, GeminiAnalyzer
-from notification import NotificationChannel, NotificationService
-from search_service import SearchService
-from storage import get_db
+from infrastructure.data import get_db
+from shared.config import Config, get_config
+from shared.enums import ReportType
 
 from .trend_analyzer import StockTrendAnalyzer, TrendAnalysisResult
 

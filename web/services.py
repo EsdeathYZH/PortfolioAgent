@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
-from enums import ReportType
+from shared.enums import ReportType
 
 logger = logging.getLogger(__name__)
 
@@ -233,8 +233,8 @@ class AnalysisService:
 
         try:
             # 延迟导入避免循环依赖
-            from config import get_config
             from main import StockAnalysisPipeline
+            from shared.config import get_config
 
             logger.info(f"[AnalysisService] 开始分析股票: {code}")
 
