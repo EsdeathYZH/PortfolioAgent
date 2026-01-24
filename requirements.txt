@@ -37,3 +37,9 @@ httpx[socks]                # HTTP 客户端 + SOCKS 代理支持（OpenAI 可�
 
 # 数据库
 # SQLite 是 Python 内置，无需额外安装
+
+# 开发依赖（可选，用于本地开发）
+# pre-commit>=3.5.0          # Git hooks 管理
+# flake8>=7.0.0               # 代码检查（已在 CI 中使用）
+# black>=24.1.0               # 代码格式化（已在 pyproject.toml 配置）
+# isort>=5.13.0               # 导入排序（已在 pyproject.toml 配置）

@@ -24,7 +24,7 @@
 ### 📊 数据来源
 - **行情数据**: AkShare（免费）、Tushare、Baostock、YFinance
 - **新闻搜索**: Tavily、SerpAPI、Bocha
-- **AI 分析**: 
+- **AI 分析**:
   - 主力：Google Gemini（gemini-3-flash-preview）—— [免费获取](https://aistudio.google.com/)
   - 备选：应大家要求，也支持了OpenAI 兼容 API（DeepSeek、通义千问、Moonshot 等）
 
@@ -191,20 +191,58 @@ daily_stock_analysis/
 ├── storage.py           # 数据存储
 ├── config.py            # 配置管理
 ├── webui.py             # WebUI 入口
-├── data_provider/       # 数据源适配器
-│   ├── akshare_fetcher.py
-│   ├── tushare_fetcher.py
-│   ├── baostock_fetcher.py
-│   └── yfinance_fetcher.py
+├── core/                # 核心业务逻辑层
+│   ├── domain/          # 领域模型
+│   └── services/        # 业务服务
+├── infrastructure/      # 基础设施层
+│   ├── ai/              # AI模块
+│   ├── data/            # 数据层
+│   └── fetchers/        # 数据获取层
+├── presentation/        # 展示层
+│   ├── cli/             # 命令行接口
+│   └── scheduler/       # 定时任务
+├── shared/              # 共享组件
+├── data_provider/      # 数据源适配器（向后兼容）
 ├── web/                 # WebUI 模块
-│   ├── server.py        # HTTP 服务器
-│   ├── router.py        # 路由管理
-│   ├── handlers.py      # 请求处理器
-│   ├── services.py      # 业务服务
-│   └── templates.py     # HTML 模板
+├── test/                # 测试
 ├── .github/workflows/   # GitHub Actions
 ├── Dockerfile           # Docker 镜像
 └── docker-compose.yml   # Docker 编排
+```
+
+## 🛠️ 开发环境设置
+
+### Pre-commit Hooks（推荐）
+
+项目使用 pre-commit 进行代码质量检查，可以在提交前自动运行检查，避免 CI 失败。
+
+#### 安装和设置
+
+```bash
+# 1. 安装 pre-commit
+pip install pre-commit
+
+# 2. 安装 Git hooks
+pre-commit install
+
+# 3. 测试运行（可选）
+pre-commit run --all-files
+```
+
+#### 功能
+
+- ✅ **自动格式化** - Black 格式化代码，isort 排序导入
+- ✅ **静态检查** - Flake8 检查严重错误（与 CI 一致）
+- ✅ **文件检查** - 检查 YAML/JSON/TOML 语法、行尾空格等
+
+#### 使用
+
+提交代码时会自动运行检查：
+
+```bash
+git add .
+git commit -m "your message"
+# hooks 会自动运行，如果有错误会阻止提交
 ```
 
 ## 🗺️ Roadmap

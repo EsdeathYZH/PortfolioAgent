@@ -40,8 +40,8 @@ assignees: ''
 - Python 版本: [例如 3.11]
 - 运行方式: [本地/Docker/GitHub Actions]
 - 相关配置:
-  - GEMINI_MODEL: 
-  - 数据源: 
+  - GEMINI_MODEL:
+  - 数据源:
 
 ## 其他信息
 添加任何其他有关问题的信息或截图。

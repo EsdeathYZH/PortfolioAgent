@@ -27,19 +27,19 @@
 提示：优先级数字越小越优先，同优先级按初始化顺序排列
 """
 
+from .akshare_fetcher import AkshareFetcher
+from .baostock_fetcher import BaostockFetcher
 from .base import BaseFetcher, DataFetcherManager
 from .efinance_fetcher import EfinanceFetcher
-from .akshare_fetcher import AkshareFetcher
 from .tushare_fetcher import TushareFetcher
-from .baostock_fetcher import BaostockFetcher
 from .yfinance_fetcher import YfinanceFetcher
 
 __all__ = [
-    'BaseFetcher',
-    'DataFetcherManager',
-    'EfinanceFetcher',
-    'AkshareFetcher',
-    'TushareFetcher',
-    'BaostockFetcher',
-    'YfinanceFetcher',
+    "BaseFetcher",
+    "DataFetcherManager",
+    "EfinanceFetcher",
+    "AkshareFetcher",
+    "TushareFetcher",
+    "BaostockFetcher",
+    "YfinanceFetcher",
 ]

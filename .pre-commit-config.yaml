@@ -1,0 +1,60 @@
+# Pre-commit hooks 配置
+# 参考: https://pre-commit.com
+#
+# 安装方式:
+#   pip install pre-commit
+#   pre-commit install
+#
+# 手动运行:
+#   pre-commit run --all-files
+#
+# 跳过 hooks (不推荐):
+#   git commit --no-verify
+
+repos:
+  # ==================== 基础文件检查 ====================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace      # 删除行尾空格
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer         # 确保文件以换行符结尾
+      - id: check-yaml                # 检查 YAML 语法
+        args: [--unsafe]              # 允许自定义标签
+      - id: check-json                # 检查 JSON 语法
+      - id: check-toml                 # 检查 TOML 语法
+      - id: check-added-large-files   # 检查大文件（默认 >500KB）
+      - id: check-merge-conflict      # 检查合并冲突标记
+      - id: check-case-conflict       # 检查文件名大小写冲突
+      - id: debug-statements          # 检查调试语句（pdb, ipdb等）
+      - id: mixed-line-ending         # 统一换行符（LF）
+
+  # ==================== Python 代码格式化 ====================
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        language_version: python3
+        args: ['--line-length=120']
+        exclude: ^(venv/|\.venv/|build/|dist/)
+
+  # ==================== 导入排序 ====================
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ['--profile', 'black', '--line-length=120']
+        exclude: ^(venv/|\.venv/|build/|dist/)
+
+  # ==================== 静态分析 - Flake8（严重错误）====================
+  # 与 CI 保持一致：只检查严重错误（E9,F63,F7,F82）
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: [
+          '--select=E9,F63,F7,F82',  # E9: 运行时错误, F63: 无效的print语法, F7: 语法错误, F82: 未定义名称
+          '--max-line-length=120',
+          '--exclude=.git,__pycache__,venv,.venv,build,dist,*.egg-info'
+        ]
+        additional_dependencies: [flake8]

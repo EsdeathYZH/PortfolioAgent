@@ -30,14 +30,15 @@ Usage:
 
 from __future__ import annotations
 
-import os
 import logging
+import os
+
+from web.handlers import ApiHandler, PageHandler
+from web.router import Router, get_router
 
 # 从 web 包导入（新架构）
-from web.server import WebServer, run_server_in_thread, run_server
-from web.router import Router, get_router
-from web.services import ConfigService, AnalysisService, get_config_service, get_analysis_service
-from web.handlers import PageHandler, ApiHandler
+from web.server import WebServer, run_server, run_server_in_thread
+from web.services import AnalysisService, ConfigService, get_analysis_service, get_config_service
 from web.templates import render_config_page, render_error_page
 
 logger = logging.getLogger(__name__)
@@ -45,37 +46,37 @@ logger = logging.getLogger(__name__)
 # 导出所有公共接口（保持向后兼容）
 __all__ = [
     # 服务器
-    'WebServer',
-    'run_server_in_thread',
-    'run_server',
+    "WebServer",
+    "run_server_in_thread",
+    "run_server",
     # 路由
-    'Router',
-    'get_router',
+    "Router",
+    "get_router",
     # 服务
-    'ConfigService',
-    'AnalysisService',
-    'get_config_service',
-    'get_analysis_service',
+    "ConfigService",
+    "AnalysisService",
+    "get_config_service",
+    "get_analysis_service",
     # 处理器
-    'PageHandler',
-    'ApiHandler',
+    "PageHandler",
+    "ApiHandler",
     # 模板
-    'render_config_page',
-    'render_error_page',
+    "render_config_page",
+    "render_error_page",
 ]
 
 
 def main() -> int:
     """
     主入口函数
-    
+
     支持环境变量配置:
         WEBUI_HOST: 监听地址 (默认 127.0.0.1)
         WEBUI_PORT: 监听端口 (默认 8000)
     """
     host = os.getenv("WEBUI_HOST", "127.0.0.1")
     port = int(os.getenv("WEBUI_PORT", "8000"))
-    
+
     print(f"WebUI running: http://{host}:{port}")
     print("API Endpoints:")
     print("  GET  /              - 配置页面")
@@ -85,12 +86,12 @@ def main() -> int:
     print("  GET  /task?id=xxx   - 任务状态")
     print("  POST /update        - 更新配置")
     print()
-    
+
     try:
         run_server(host=host, port=port)
     except KeyboardInterrupt:
         pass
-    
+
     return 0
 
 

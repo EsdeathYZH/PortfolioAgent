@@ -46,7 +46,6 @@ env/
 .cursorrules
 
 # 数据和日志
-data/
 logs/
 reports/
 *.db
@@ -67,3 +66,5 @@ local/
 run.sh
 
 verify_*.py
+
+dev-docs/

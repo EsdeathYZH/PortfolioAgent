@@ -13,10 +13,10 @@ Web 服务模块
 
 使用方式：
     from web import run_server_in_thread, WebServer
-    
+
     # 后台启动
     run_server_in_thread(host="127.0.0.1", port=8000)
-    
+
     # 前台启动
     server = WebServer(host="127.0.0.1", port=8000)
     server.run()
@@ -25,6 +25,6 @@ Web 服务模块
 from web.server import WebServer, run_server_in_thread
 
 __all__ = [
-    'WebServer',
-    'run_server_in_thread',
+    "WebServer",
+    "run_server_in_thread",
 ]
