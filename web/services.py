@@ -233,14 +233,26 @@ class AnalysisService:
 
         try:
             # 延迟导入避免循环依赖
-            from main import StockAnalysisPipeline
+            from core.services.analysis.pipeline import StockAnalysisPipeline
+            from core.services.user import UserConfigLoader
             from shared.config import get_config
 
             logger.info(f"[AnalysisService] 开始分析股票: {code}")
 
+            # 加载用户配置（Web UI 使用第一个用户的配置）
+            config_loader = UserConfigLoader()
+            user_configs = config_loader.load_users()
+
+            if not user_configs:
+                raise ValueError("未配置用户，请在环境变量中设置 USERS 和 USER_<username>_* 配置")
+
+            # 使用第一个用户的配置（Web UI 场景）
+            user_config = user_configs[0]
+            logger.info(f"[AnalysisService] 使用用户 {user_config.username} 的配置进行分析")
+
             # 创建分析管道
             config = get_config()
-            pipeline = StockAnalysisPipeline(config=config, max_workers=1)
+            pipeline = StockAnalysisPipeline(config=config, max_workers=1, user_config=user_config)
 
             # 执行单只股票分析（启用单股推送）
             result = pipeline.process_single_stock(

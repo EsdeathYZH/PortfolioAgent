@@ -43,6 +43,11 @@ jobs:
 
       - name: 执行股票分析
         env:
+          # ==================== 多用户配置（必需）====================
+          # 用户列表（例如：USERS=allen,hong）
+          USERS: ${{ secrets.USERS }}
+
+          # ==================== 全局配置 ====================
           # Gemini AI
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || secrets.GEMINI_MODEL || 'gemini-3-flash-preview' }}
@@ -62,33 +67,42 @@ jobs:
           OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL || secrets.OPENAI_BASE_URL }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || secrets.OPENAI_MODEL }}
 
-          # 通知渠道（可同时配置多个，全部推送）
-          # 方式一：企业微信
-          WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
-          # 方式二：飞书
-          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
-          # 方式三：Telegram（需同时配置 Bot Token 和 Chat ID）
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          # 方式四：邮件（只需邮箱和授权码，SMTP自动识别）
-          EMAIL_SENDER: ${{ vars.EMAIL_SENDER || secrets.EMAIL_SENDER }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          EMAIL_RECEIVERS: ${{ vars.EMAIL_RECEIVERS || secrets.EMAIL_RECEIVERS }}
-          # 方式五：自定义 Webhook（支持钉钉、Discord、Slack、Bark等，多个用逗号分隔）
-          CUSTOM_WEBHOOK_URLS: ${{ secrets.CUSTOM_WEBHOOK_URLS }}
-          CUSTOM_WEBHOOK_BEARER_TOKEN: ${{ secrets.CUSTOM_WEBHOOK_BEARER_TOKEN }}
-          # 方式六：Server酱/Web推送API
-          SERVERCHAN_SEND_KEY: ${{ secrets.SERVERCHAN_SEND_KEY }}
-          SERVERCHAN_CHANNEL: ${{ vars.SERVERCHAN_CHANNEL || secrets.SERVERCHAN_CHANNEL }}
-          SERVERCHAN_NOIP: ${{ vars.SERVERCHAN_NOIP || secrets.SERVERCHAN_NOIP || 'false' }}
-          # 方式七：飞书文档
+          # 飞书文档（全局）
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           FEISHU_FOLDER_TOKEN: ${{ secrets.FEISHU_FOLDER_TOKEN }}
 
+          # ==================== 多用户配置格式 =====================
+          # 格式：USER_XXX="user1:value1;user2:value2"
+          # 股票列表（必需，格式：USER_STOCKS="allen:a,b;hong:c,d"）
+          USER_STOCKS: ${{ secrets.USER_STOCKS }}
 
-          # 自选股列表 (从 secrets 或使用默认值)
-          STOCK_LIST: ${{ vars.STOCK_LIST || secrets.STOCK_LIST || '600519' }}
+          # 通知渠道（至少配置一个）
+          # Email 配置（格式：USER_EMAIL_SENDER="allen:sender1@example.com;hong:sender2@example.com"）
+          USER_EMAIL_SENDER: ${{ secrets.USER_EMAIL_SENDER }}
+          USER_EMAIL_PASSWORD: ${{ secrets.USER_EMAIL_PASSWORD }}
+          USER_EMAIL_RECEIVERS: ${{ secrets.USER_EMAIL_RECEIVERS }}
+
+          # ServerChan（格式：USER_SERVERCHAN_SEND_KEY="allen:key1;hong:key2"）
+          USER_SERVERCHAN_SEND_KEY: ${{ secrets.USER_SERVERCHAN_SEND_KEY }}
+
+          # 企业微信（格式：USER_WECHAT_WEBHOOK_URL="allen:url1;hong:url2"）
+          USER_WECHAT_WEBHOOK_URL: ${{ secrets.USER_WECHAT_WEBHOOK_URL }}
+
+          # 飞书（格式：USER_FEISHU_WEBHOOK_URL="allen:url1;hong:url2"）
+          USER_FEISHU_WEBHOOK_URL: ${{ secrets.USER_FEISHU_WEBHOOK_URL }}
+
+          # Telegram（格式：USER_TELEGRAM_BOT_TOKEN="allen:token1;hong:token2"）
+          USER_TELEGRAM_BOT_TOKEN: ${{ secrets.USER_TELEGRAM_BOT_TOKEN }}
+          USER_TELEGRAM_CHAT_ID: ${{ secrets.USER_TELEGRAM_CHAT_ID }}
+
+          # Pushover（格式：USER_PUSHOVER_USER_KEY="allen:key1;hong:key2"）
+          USER_PUSHOVER_USER_KEY: ${{ secrets.USER_PUSHOVER_USER_KEY }}
+          USER_PUSHOVER_API_TOKEN: ${{ secrets.USER_PUSHOVER_API_TOKEN }}
+
+          # Custom Webhook（格式：USER_CUSTOM_WEBHOOK_URLS="allen:url1,url2;hong:url3"）
+          USER_CUSTOM_WEBHOOK_URLS: ${{ secrets.USER_CUSTOM_WEBHOOK_URLS }}
+          USER_CUSTOM_WEBHOOK_BEARER_TOKEN: ${{ secrets.USER_CUSTOM_WEBHOOK_BEARER_TOKEN }}
 
           # 其他配置
           LOG_LEVEL: INFO
@@ -100,7 +114,7 @@ jobs:
 
           echo "=========================================="
           echo "运行模式: $MODE"
-          echo "自选股: $STOCK_LIST"
+          echo "用户列表: $USERS"
           echo "时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
           echo "BOCHA_API_KEYS 是否配置: $([ -n "$BOCHA_API_KEYS" ] && echo '是' || echo '否')"
           echo "BOCHA_API_KEYS 长度: ${#BOCHA_API_KEYS}"

@@ -20,6 +20,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from core.domain.analysis import AnalysisResult
+from core.domain.user import UserConfig
 from core.services.notification import NotificationService
 from core.services.notification.channels.base import NotificationChannel
 from core.services.search import SearchService
@@ -45,16 +46,23 @@ class StockAnalysisPipeline:
     3. 实现并发控制和异常处理
     """
 
-    def __init__(self, config: Optional[Config] = None, max_workers: Optional[int] = None):
+    def __init__(
+        self, config: Optional[Config] = None, max_workers: Optional[int] = None, user_config: UserConfig = None
+    ):
         """
         初始化调度器
 
         Args:
-            config: 配置对象（可选，默认使用全局配置）
+            config: 配置对象（可选，默认使用全局配置，用于AI、数据源等共享配置）
             max_workers: 最大并发线程数（可选，默认从配置读取）
+            user_config: 用户配置（必需）
         """
+        if user_config is None:
+            raise ValueError("user_config 参数是必需的，请传入 UserConfig 对象")
+
         self.config = config or get_config()
         self.max_workers = max_workers or self.config.max_workers
+        self.user_config = user_config
 
         # 初始化各模块
         self.db = get_db()
@@ -62,7 +70,7 @@ class StockAnalysisPipeline:
         self.akshare_fetcher = AkshareFetcher()  # 用于获取增强数据（量比、筹码等）
         self.trend_analyzer = StockTrendAnalyzer()  # 趋势分析器
         self.analyzer = GeminiAnalyzer()
-        self.notifier = NotificationService()
+        self.notifier = NotificationService(user_config=user_config)  # 使用用户专属的通知服务
 
         # 初始化搜索服务
         self.search_service = SearchService(

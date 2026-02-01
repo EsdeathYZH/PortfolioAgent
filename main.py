@@ -39,6 +39,7 @@ from typing import List, Optional
 from core.services.analysis import MarketAnalyzer, StockAnalysisPipeline
 from core.services.notification import NotificationService
 from core.services.search import SearchService
+from core.services.user import UserConfigLoader
 from infrastructure.ai import GeminiAnalyzer
 from infrastructure.external import FeishuDocManager
 from presentation.cli import parse_arguments, setup_logging
@@ -95,77 +96,101 @@ def run_market_review(notifier: NotificationService, analyzer=None, search_servi
 
 def run_full_analysis(config: Config, args, stock_codes: Optional[List[str]] = None):
     """
-    执行完整的分析流程（个股 + 大盘复盘）
+    执行完整的分析流程（多用户模式）
 
     这是定时任务调用的主函数
+    遍历所有用户，为每个用户执行分析并发送通知
     """
     try:
+        # 加载用户配置
+        config_loader = UserConfigLoader()
+        user_configs = config_loader.load_users()
+
+        if not user_configs:
+            raise ValueError("未配置用户，请在环境变量中设置 USERS 和 USER_<username>_* 配置")
+
         # 命令行参数 --single-notify 覆盖配置（#55）
         if getattr(args, "single_notify", False):
             config.single_stock_notify = True
 
-        # 创建调度器
-        pipeline = StockAnalysisPipeline(config=config, max_workers=args.workers)
+        # 为每个用户执行分析
+        for user_config in user_configs:
+            logger.info(f"\n{'=' * 60}")
+            logger.info(f"===== 开始为用户 {user_config.username} 执行分析 =====")
+            logger.info(f"{'=' * 60}")
 
-        # 1. 运行个股分析
-        results = pipeline.run(stock_codes=stock_codes, dry_run=args.dry_run, send_notification=not args.no_notify)
+            if not user_config.stocks:
+                logger.warning(f"用户 {user_config.username} 未配置订阅股票，跳过")
+                continue
 
-        # 2. 运行大盘复盘（如果启用且不是仅个股模式）
-        market_report = ""
-        if config.market_review_enabled and not args.no_market_review:
-            # 只调用一次，并获取结果
-            review_result = run_market_review(
-                notifier=pipeline.notifier, analyzer=pipeline.analyzer, search_service=pipeline.search_service
-            )
-            # 如果有结果，赋值给 market_report 用于后续飞书文档生成
-            if review_result:
-                market_report = review_result
+            # 创建分析流程（传入用户配置）
+            pipeline = StockAnalysisPipeline(config=config, max_workers=args.workers, user_config=user_config)
 
-        # 输出摘要
-        if results:
-            logger.info("\n===== 分析结果摘要 =====")
-            for r in sorted(results, key=lambda x: x.sentiment_score, reverse=True):
-                emoji = r.get_emoji()
-                logger.info(
-                    f"{emoji} {r.name}({r.code}): {r.operation_advice} | "
-                    f"评分 {r.sentiment_score} | {r.trend_prediction}"
+            # 1. 运行个股分析（使用用户的股票列表）
+            user_stocks = stock_codes if stock_codes else user_config.stocks
+            results = pipeline.run(stock_codes=user_stocks, dry_run=args.dry_run, send_notification=not args.no_notify)
+
+            # 2. 运行大盘复盘（如果启用且不是仅个股模式）
+            market_report = ""
+            if config.market_review_enabled and not args.no_market_review:
+                # 只调用一次，并获取结果
+                review_result = run_market_review(
+                    notifier=pipeline.notifier, analyzer=pipeline.analyzer, search_service=pipeline.search_service
                 )
+                # 如果有结果，赋值给 market_report 用于后续飞书文档生成
+                if review_result:
+                    market_report = review_result
 
-        logger.info("\n任务执行完成")
+            # 输出摘要
+            if results:
+                logger.info(f"\n===== 用户 {user_config.username} 分析结果摘要 =====")
+                for r in sorted(results, key=lambda x: x.sentiment_score, reverse=True):
+                    emoji = r.get_emoji()
+                    logger.info(
+                        f"{emoji} {r.name}({r.code}): {r.operation_advice} | "
+                        f"评分 {r.sentiment_score} | {r.trend_prediction}"
+                    )
 
-        # === 新增：生成飞书云文档 ===
-        try:
-            feishu_doc = FeishuDocManager()
-            if feishu_doc.is_configured() and (results or market_report):
-                logger.info("正在创建飞书云文档...")
+            logger.info(f"用户 {user_config.username} 分析完成，共 {len(results)} 只股票")
 
-                # 1. 准备标题 "01-01 13:01大盘复盘"
-                tz_cn = timezone(timedelta(hours=8))
-                now = datetime.now(tz_cn)
-                doc_title = f"{now.strftime('%Y-%m-%d %H:%M')} 大盘复盘"
+            # === 生成飞书云文档（如果用户配置了飞书渠道）===
+            try:
+                feishu_doc = FeishuDocManager()
+                if feishu_doc.is_configured() and (results or market_report):
+                    logger.info(f"正在为用户 {user_config.username} 创建飞书云文档...")
 
-                # 2. 准备内容 (拼接个股分析和大盘复盘)
-                full_content = ""
+                    # 1. 准备标题 "01-01 13:01大盘复盘 - 用户xxx"
+                    tz_cn = timezone(timedelta(hours=8))
+                    now = datetime.now(tz_cn)
+                    doc_title = f"{now.strftime('%Y-%m-%d %H:%M')} 大盘复盘 - {user_config.username}"
 
-                # 添加大盘复盘内容（如果有）
-                if market_report:
-                    full_content += f"# 📈 大盘复盘\n\n{market_report}\n\n---\n\n"
+                    # 2. 准备内容 (拼接个股分析和大盘复盘)
+                    full_content = ""
 
-                # 添加个股决策仪表盘（使用 NotificationService 生成）
-                if results:
-                    dashboard_content = pipeline.notifier.generate_dashboard_report(results)
-                    full_content += f"# 🚀 个股决策仪表盘\n\n{dashboard_content}"
+                    # 添加大盘复盘内容（如果有）
+                    if market_report:
+                        full_content += f"# 📈 大盘复盘\n\n{market_report}\n\n---\n\n"
 
-                # 3. 创建文档
-                doc_url = feishu_doc.create_daily_doc(doc_title, full_content)
-                if doc_url:
-                    logger.info(f"飞书云文档创建成功: {doc_url}")
-                    # 可选：将文档链接也推送到群里
-                    pipeline.notifier.send(f"[{now.strftime('%Y-%m-%d %H:%M')}] 复盘文档创建成功: {doc_url}")
+                    # 添加个股决策仪表盘（使用 NotificationService 生成）
+                    if results:
+                        dashboard_content = pipeline.notifier.generate_dashboard_report(results)
+                        full_content += f"# 🚀 个股决策仪表盘\n\n{dashboard_content}"
 
-        except Exception as e:
-            logger.error(f"飞书文档生成失败: {e}")
+                    # 3. 创建文档
+                    doc_url = feishu_doc.create_daily_doc(doc_title, full_content)
+                    if doc_url:
+                        logger.info(f"飞书云文档创建成功: {doc_url}")
+                        # 可选：将文档链接也推送到用户的渠道
+                        pipeline.notifier.send(f"[{now.strftime('%Y-%m-%d %H:%M')}] 复盘文档创建成功: {doc_url}")
 
+            except Exception as e:
+                logger.error(f"用户 {user_config.username} 飞书文档生成失败: {e}")
+
+        logger.info("\n所有用户分析任务执行完成")
+
+    except ValueError as e:
+        logger.error(f"配置错误: {e}")
+        raise
     except Exception as e:
         logger.exception(f"分析流程执行失败: {e}")
 
@@ -231,7 +256,13 @@ def main() -> int:
         # 模式1: 仅大盘复盘
         if args.market_review:
             logger.info("模式: 仅大盘复盘")
-            notifier = NotificationService()
+
+            # 加载用户配置，为每个用户发送大盘复盘
+            config_loader = UserConfigLoader()
+            user_configs = config_loader.load_users()
+
+            if not user_configs:
+                raise ValueError("未配置用户，请在环境变量中设置 USERS 和 USER_<username>_* 配置")
 
             # 初始化搜索服务和分析器（如果有配置）
             search_service = None
@@ -247,7 +278,12 @@ def main() -> int:
             if config.gemini_api_key:
                 analyzer = GeminiAnalyzer(api_key=config.gemini_api_key)
 
-            run_market_review(notifier, analyzer, search_service)
+            # 为每个用户执行大盘复盘
+            for user_config in user_configs:
+                logger.info(f"为用户 {user_config.username} 执行大盘复盘...")
+                notifier = NotificationService(user_config=user_config)
+                run_market_review(notifier, analyzer, search_service)
+
             return 0
 
         # 模式2: 定时任务模式
