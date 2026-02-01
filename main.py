@@ -126,9 +126,21 @@ def run_full_analysis(config: Config, args, stock_codes: Optional[List[str]] = N
             # 创建分析流程（传入用户配置）
             pipeline = StockAnalysisPipeline(config=config, max_workers=args.workers, user_config=user_config)
 
+            # 确定资产类型过滤
+            asset_type_filter = None
+            if getattr(args, "commodity_only", False):
+                asset_type_filter = "gold"
+            elif getattr(args, "asset_type", "all") != "all":
+                asset_type_filter = args.asset_type
+
             # 1. 运行个股分析（使用用户的股票列表）
             user_stocks = stock_codes if stock_codes else user_config.stocks
-            results = pipeline.run(stock_codes=user_stocks, dry_run=args.dry_run, send_notification=not args.no_notify)
+            results = pipeline.run(
+                stock_codes=user_stocks,
+                dry_run=args.dry_run,
+                send_notification=not args.no_notify,
+                asset_type_filter=asset_type_filter,
+            )
 
             # 2. 运行大盘复盘（如果启用且不是仅个股模式）
             market_report = ""
@@ -253,6 +265,15 @@ def main() -> int:
         return 0
 
     try:
+        # 处理资产类型过滤参数
+        asset_type_filter = None
+        if getattr(args, "commodity_only", False):
+            asset_type_filter = "gold"
+            logger.info("模式: 仅商品分析（黄金）")
+        elif getattr(args, "asset_type", "all") != "all":
+            asset_type_filter = args.asset_type
+            logger.info(f"模式: 仅分析 {asset_type_filter} 类型资产")
+
         # 模式1: 仅大盘复盘
         if args.market_review:
             logger.info("模式: 仅大盘复盘")

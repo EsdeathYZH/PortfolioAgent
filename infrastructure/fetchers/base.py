@@ -263,6 +263,9 @@ class DataFetcherManager:
           2. TushareFetcher (Priority 2)
           3. BaostockFetcher (Priority 3)
           4. YfinanceFetcher (Priority 4)
+
+        注意：这些数据源都支持多种资产类型（股票、ETF、港股、黄金等），
+        通过代码识别自动选择对应的 API。
         """
         from common.config import get_config
 
@@ -314,8 +317,16 @@ class DataFetcherManager:
         3. 记录每个数据源的失败原因
         4. 所有数据源失败后抛出详细异常
 
+        支持的资产类型：
+        - 股票代码（如 "600519", "000001"）
+        - ETF 代码（如 "512400", "159883"）
+        - 港股代码（如 "00700"）
+        - 黄金代码（"AU"）
+
+        各数据源会根据代码类型自动选择对应的 API。
+
         Args:
-            stock_code: 股票代码
+            stock_code: 资产代码（股票/ETF/港股/黄金）
             start_date: 开始日期
             end_date: 结束日期
             days: 获取天数

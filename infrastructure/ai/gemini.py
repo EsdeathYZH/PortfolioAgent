@@ -24,6 +24,7 @@ from common.config import get_config
 from core.domain.analysis import AnalysisResult
 
 from .parsers.dashboard_parser import DashboardParser
+from .prompts.gold_analysis import GOLD_SYSTEM_PROMPT
 from .prompts.stock_analysis import SYSTEM_PROMPT
 
 # 股票名称映射（常见股票）
@@ -685,6 +686,229 @@ class GeminiAnalyzer:
             return f"{amount / 1e4:.2f} 万元"
         else:
             return f"{amount:.0f} 元"
+
+    def analyze_gold(self, context: Dict[str, Any], news_context: Optional[str] = None) -> AnalysisResult:
+        """
+        分析黄金
+
+        使用专门的黄金分析 Prompt 和格式化方法
+
+        Args:
+            context: 黄金数据上下文（价格、技术指标等）
+            news_context: 新闻/资讯上下文（美联储政策、通胀数据、地缘政治等）
+
+        Returns:
+            AnalysisResult: 分析结果
+        """
+        code = context.get("code", "AU")
+        gold_name = context.get("gold_name", "黄金")
+
+        config = get_config()
+
+        # 请求前增加延时（防止连续请求触发限流）
+        request_delay = config.gemini_request_delay
+        if request_delay > 0:
+            logger.debug(f"[LLM] 请求前等待 {request_delay:.1f} 秒...")
+            time.sleep(request_delay)
+
+        # 如果模型不可用，返回默认结果
+        if not self.is_available():
+            return AnalysisResult(
+                code=code,
+                name=gold_name,
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="持有",
+                confidence_level="低",
+                analysis_summary="AI 分析功能未启用（未配置 API Key）",
+                risk_warning="请配置 Gemini API Key 后重试",
+                success=False,
+                error_message="Gemini API Key 未配置",
+            )
+
+        try:
+            # 格式化黄金分析提示词
+            prompt = self._format_gold_prompt(context, gold_name, news_context)
+
+            # 获取模型名称
+            model_name = getattr(self, "_current_model_name", None)
+            if not model_name:
+                model_name = getattr(self._model, "_model_name", "unknown")
+                if hasattr(self._model, "model_name"):
+                    model_name = self._model.model_name
+
+            logger.info(f"========== AI 分析黄金 {gold_name}({code}) ==========")
+            logger.info(f"[LLM配置] 模型: {model_name}")
+            logger.info(f"[LLM配置] Prompt 长度: {len(prompt)} 字符")
+            logger.info(f"[LLM配置] 是否包含新闻: {'是' if news_context else '否'}")
+
+            # 记录完整 prompt 到日志
+            prompt_preview = prompt[:500] + "..." if len(prompt) > 500 else prompt
+            logger.info(f"[LLM Prompt 预览]\n{prompt_preview}")
+            logger.debug(f"=== 完整 Prompt ({len(prompt)}字符) ===\n{prompt}\n=== End Prompt ===")
+
+            # 设置生成配置
+            generation_config = {
+                "temperature": 0.7,
+                "max_output_tokens": 8192,
+            }
+
+            logger.info(
+                f"[LLM调用] 开始调用 Gemini API (temperature={generation_config['temperature']}, max_tokens={generation_config['max_output_tokens']})..."
+            )
+
+            # 临时切换系统提示词为黄金分析 Prompt
+            original_system_prompt = self.SYSTEM_PROMPT
+            self.SYSTEM_PROMPT = GOLD_SYSTEM_PROMPT
+
+            # 如果使用 Gemini，需要重新初始化模型以应用新的系统提示词
+            if self._model and not self._use_openai:
+                try:
+                    import google.generativeai as genai
+
+                    self._model = genai.GenerativeModel(
+                        model_name=self._current_model_name or "gemini-pro",
+                        system_instruction=GOLD_SYSTEM_PROMPT,
+                    )
+                except Exception as e:
+                    logger.warning(f"重新初始化模型失败，继续使用原模型: {e}")
+
+            # 使用带重试的 API 调用
+            start_time = time.time()
+            response_text = self._call_api_with_retry(prompt, generation_config)
+            elapsed = time.time() - start_time
+
+            # 恢复原始系统提示词
+            self.SYSTEM_PROMPT = original_system_prompt
+            if self._model and not self._use_openai:
+                try:
+                    import google.generativeai as genai
+
+                    self._model = genai.GenerativeModel(
+                        model_name=self._current_model_name or "gemini-pro",
+                        system_instruction=original_system_prompt,
+                    )
+                except Exception as e:
+                    logger.warning(f"恢复模型失败: {e}")
+
+            # 记录响应信息
+            logger.info(f"[LLM返回] Gemini API 响应成功, 耗时 {elapsed:.2f}s, 响应长度 {len(response_text)} 字符")
+
+            # 记录响应预览
+            response_preview = response_text[:300] + "..." if len(response_text) > 300 else response_text
+            logger.info(f"[LLM返回 预览]\n{response_preview}")
+            logger.debug(f"=== Gemini 完整响应 ({len(response_text)}字符) ===\n{response_text}\n=== End Response ===")
+
+            # 解析响应（使用解析器，黄金分析结果格式与股票分析相同）
+            result = self._parser.parse(response_text, code, gold_name)
+            result.raw_response = response_text
+            result.search_performed = bool(news_context)
+
+            logger.info(
+                f"[LLM解析] {gold_name}({code}) 分析完成: {result.trend_prediction}, 评分 {result.sentiment_score}"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"AI 分析黄金 {gold_name}({code}) 失败: {e}")
+            return AnalysisResult(
+                code=code,
+                name=gold_name,
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="持有",
+                confidence_level="低",
+                analysis_summary=f"分析过程出错: {str(e)[:100]}",
+                risk_warning="分析失败，请稍后重试或手动分析",
+                success=False,
+                error_message=str(e),
+            )
+
+    def _format_gold_prompt(self, context: Dict[str, Any], gold_name: str, news_context: Optional[str] = None) -> str:
+        """
+        格式化黄金分析提示词
+
+        包含：技术指标、价格趋势、基本面分析、新闻
+
+        Args:
+            context: 黄金数据上下文
+            gold_name: 黄金名称
+            news_context: 预先搜索的新闻内容
+        """
+        code = context.get("code", "AU")
+        today = context.get("today", {})
+
+        # ========== 构建黄金分析输入 ==========
+        prompt = f"""# 黄金交易决策分析请求
+
+## 📊 黄金基础信息
+| 项目 | 数据 |
+|------|------|
+| 代码 | **{code}** |
+| 名称 | **{gold_name}** |
+| 分析日期 | {context.get('date', '未知')} |
+
+---
+
+## 📈 技术面数据
+
+### 今日行情
+| 指标 | 数值 |
+|------|------|
+| 收盘价 | {today.get('close', 'N/A')} |
+| 开盘价 | {today.get('open', 'N/A')} |
+| 最高价 | {today.get('high', 'N/A')} |
+| 最低价 | {today.get('low', 'N/A')} |
+| 涨跌幅 | {today.get('pct_chg', 'N/A')}% |
+| 成交量 | {self._format_volume(today.get('volume'))} |
+
+### 均线系统
+| 均线 | 数值 | 说明 |
+|------|------|------|
+| MA5 | {today.get('ma5', 'N/A')} | 短期趋势线 |
+| MA10 | {today.get('ma10', 'N/A')} | 中短期趋势线 |
+| MA20 | {today.get('ma20', 'N/A')} | 中期趋势线 |
+
+### 趋势分析
+"""
+
+        # 添加趋势分析结果
+        if "trend_analysis" in context:
+            trend = context["trend_analysis"]
+            prompt += f"""
+- **趋势状态**: {trend.get('trend_status', '未知')}
+- **均线排列**: {trend.get('ma_alignment', '未知')}
+- **趋势强度**: {trend.get('trend_strength', '未知')}
+- **买入信号**: {trend.get('buy_signal', '未知')}
+- **信号评分**: {trend.get('signal_score', 'N/A')}
+"""
+
+        prompt += "\n---\n\n## 💰 基本面分析\n\n"
+
+        # 添加新闻/资讯上下文
+        if news_context:
+            prompt += f"### 市场资讯\n{news_context}\n\n"
+        else:
+            prompt += "### 市场资讯\n暂无最新资讯，请基于技术面分析。\n\n"
+
+        prompt += """
+---
+
+## 📋 分析要求
+
+请基于以上数据，生成完整的【黄金交易决策仪表盘】JSON 格式报告。
+
+重点关注：
+1. **技术面**：价格趋势、支撑位/压力位、成交量
+2. **基本面**：美元指数、通胀数据、美联储政策（如资讯中有提及）
+3. **交易建议**：买入/卖出点位、止损位、目标位
+4. **风险提示**：黄金波动较大，务必包含明确的风险提示
+
+请严格按照 JSON 格式输出，确保所有字段完整。
+"""
+
+        return prompt
 
     def batch_analyze(self, contexts: List[Dict[str, Any]], delay_between: float = 2.0) -> List[AnalysisResult]:
         """

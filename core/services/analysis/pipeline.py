@@ -408,45 +408,260 @@ class StockAnalysisPipeline:
             logger.exception(f"[{code}] 处理过程发生未知异常: {e}")
             return None
 
+    def process_gold(
+        self,
+        code: str = "AU",
+        skip_analysis: bool = False,
+        single_stock_notify: bool = False,
+        report_type: ReportType = ReportType.SIMPLE,
+    ) -> Optional[AnalysisResult]:
+        """
+        处理黄金分析的完整流程
+
+        流程：
+        1. 获取黄金数据
+        2. 保存数据
+        3. 搜索黄金相关资讯
+        4. AI分析
+        5. 生成报告
+
+        Args:
+            code: 黄金代码（默认 "AU"）
+            skip_analysis: 是否跳过 AI 分析
+            single_stock_notify: 是否启用单股推送模式
+            report_type: 报告类型枚举
+
+        Returns:
+            AnalysisResult 或 None
+        """
+        logger.info(f"========== 开始处理黄金 {code} ==========")
+
+        try:
+            # Step 1: 获取并保存黄金数据
+            success, error = self.fetch_and_save_stock_data(code)  # 复用现有方法，DataFetcherManager 会自动识别 AU
+
+            if not success:
+                logger.warning(f"[{code}] 黄金数据获取失败: {error}")
+                # 即使获取失败，也尝试用已有数据分析
+
+            # Step 2: AI 分析
+            if skip_analysis:
+                logger.info(f"[{code}] 跳过 AI 分析（dry-run 模式）")
+                return None
+
+            result = self.analyze_gold(code)
+
+            if result:
+                logger.info(f"[{code}] 黄金分析完成: {result.operation_advice}, " f"评分 {result.sentiment_score}")
+
+                # 单股推送模式：每分析完立即推送
+                if single_stock_notify and self.notifier.is_available():
+                    try:
+                        if report_type == ReportType.FULL:
+                            report_content = self.notifier.generate_dashboard_report([result])
+                            logger.info(f"[{code}] 使用完整报告格式")
+                        else:
+                            report_content = self.notifier.generate_single_stock_report(result)
+                            logger.info(f"[{code}] 使用精简报告格式")
+
+                        if self.notifier.send(report_content):
+                            logger.info(f"[{code}] 黄金单股推送成功")
+                        else:
+                            logger.warning(f"[{code}] 黄金单股推送失败")
+                    except Exception as e:
+                        logger.error(f"[{code}] 黄金单股推送异常: {e}")
+
+            return result
+
+        except Exception as e:
+            logger.exception(f"[{code}] 黄金处理过程发生未知异常: {e}")
+            return None
+
+    def analyze_gold(self, code: str = "AU") -> Optional[AnalysisResult]:
+        """
+        分析黄金
+
+        流程：
+        1. 进行趋势分析（基于交易理念）
+        2. 搜索黄金相关资讯（美联储政策、通胀数据、地缘政治等）
+        3. 从数据库获取分析上下文
+        4. 调用 AI 进行综合分析
+
+        Args:
+            code: 黄金代码（"AU"）
+
+        Returns:
+            AnalysisResult 或 None（如果分析失败）
+        """
+        try:
+            gold_name = "黄金"
+
+            # Step 1: 趋势分析（基于交易理念）
+            trend_result: Optional[TrendAnalysisResult] = None
+            try:
+                # 获取历史数据进行趋势分析
+                context = self.db.get_analysis_context(code)
+                if context and "raw_data" in context:
+                    import pandas as pd
+
+                    raw_data = context["raw_data"]
+                    if isinstance(raw_data, list) and len(raw_data) > 0:
+                        df = pd.DataFrame(raw_data)
+                        trend_result = self.trend_analyzer.analyze(df, code)
+                        logger.info(
+                            f"[{code}] 黄金趋势分析: {trend_result.trend_status.value}, "
+                            f"买入信号={trend_result.buy_signal.value}, 评分={trend_result.signal_score}"
+                        )
+            except Exception as e:
+                logger.warning(f"[{code}] 黄金趋势分析失败: {e}")
+
+            # Step 2: 搜索黄金相关资讯
+            news_context = None
+            if self.search_service.is_available:
+                logger.info(f"[{code}] 开始搜索黄金相关资讯...")
+
+                # 使用专门的黄金情报搜索方法
+                try:
+                    intel_results = self.search_service.search_gold_intel(max_searches=3)
+
+                    if intel_results:
+                        news_context = self.search_service.format_intel_report(intel_results, gold_name)
+                        total_results = sum(len(r.results) for r in intel_results.values() if r.success)
+                        logger.info(f"[{code}] 黄金情报搜索完成: 共 {total_results} 条结果")
+                        logger.debug(f"[{code}] 黄金情报搜索结果:\n{news_context}")
+                except Exception as e:
+                    logger.warning(f"[{code}] 黄金情报搜索失败: {e}")
+            else:
+                logger.info(f"[{code}] 搜索服务不可用，跳过黄金情报搜索")
+
+            # Step 3: 获取分析上下文（技术面数据）
+            context = self.db.get_analysis_context(code)
+
+            if context is None:
+                logger.warning(f"[{code}] 无法获取黄金分析上下文，跳过分析")
+                return None
+
+            # Step 4: 增强上下文数据（添加趋势分析结果、黄金名称）
+            enhanced_context = self._enhance_gold_context(context, trend_result, gold_name)
+
+            # Step 5: 调用 AI 分析（传入增强的上下文和新闻）
+            # 注意：这里需要调用专门的黄金分析方法
+            result = self.analyzer.analyze_gold(enhanced_context, news_context=news_context)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"[{code}] 黄金分析失败: {e}")
+            logger.exception(f"[{code}] 详细错误信息:")
+            return None
+
+    def _enhance_gold_context(
+        self,
+        context: Dict[str, Any],
+        trend_result: Optional[TrendAnalysisResult],
+        gold_name: str = "黄金",
+    ) -> Dict[str, Any]:
+        """
+        增强黄金分析上下文
+
+        将趋势分析结果、黄金名称添加到上下文中
+
+        Args:
+            context: 原始上下文
+            trend_result: 趋势分析结果
+            gold_name: 黄金名称
+
+        Returns:
+            增强后的上下文
+        """
+        enhanced = context.copy()
+
+        # 添加黄金名称
+        enhanced["gold_name"] = gold_name
+        enhanced["asset_type"] = "gold"
+
+        # 添加趋势分析结果
+        if trend_result:
+            enhanced["trend_analysis"] = {
+                "trend_status": trend_result.trend_status.value,
+                "ma_alignment": trend_result.ma_alignment,
+                "trend_strength": trend_result.trend_strength,
+                "bias_ma5": trend_result.bias_ma5,
+                "bias_ma10": trend_result.bias_ma10,
+                "volume_status": trend_result.volume_status.value,
+                "volume_trend": trend_result.volume_trend,
+                "buy_signal": trend_result.buy_signal.value,
+                "signal_score": trend_result.signal_score,
+                "signal_reasons": trend_result.signal_reasons,
+                "risk_factors": trend_result.risk_factors,
+            }
+
+        return enhanced
+
     def run(
-        self, stock_codes: Optional[List[str]] = None, dry_run: bool = False, send_notification: bool = True
+        self,
+        stock_codes: Optional[List[str]] = None,
+        dry_run: bool = False,
+        send_notification: bool = True,
+        asset_type_filter: Optional[str] = None,
     ) -> List[AnalysisResult]:
         """
         运行完整的分析流程
 
         流程：
-        1. 获取待分析的股票列表
-        2. 使用线程池并发处理
-        3. 收集分析结果
-        4. 发送通知
+        1. 获取待分析的资产列表（股票+黄金）
+        2. 根据资产类型过滤
+        3. 使用线程池并发处理
+        4. 收集分析结果
+        5. 发送通知
 
         Args:
-            stock_codes: 股票代码列表（可选，默认使用配置中的自选股）
+            stock_codes: 资产代码列表（可选，默认使用配置中的自选股）
             dry_run: 是否仅获取数据不分析
             send_notification: 是否发送推送通知
+            asset_type_filter: 资产类型过滤，可选 "stock", "gold", None(全部)
 
         Returns:
             分析结果列表
         """
         start_time = time.time()
 
-        # 使用配置中的股票列表
+        # 解析资产列表（区分股票和黄金）
         if stock_codes is None:
-            self.config.refresh_stock_list()
-            stock_codes = self.config.stock_list
+            # 使用用户配置中的资产列表
+            assets = self.user_config.get_asset_list()
+        else:
+            # 从命令行参数解析资产类型
+            assets = []
+            for code in stock_codes:
+                code_upper = code.strip().upper()
+                if code_upper == "AU":
+                    assets.append((code.strip(), "gold"))
+                else:
+                    assets.append((code.strip(), "stock"))
 
-        if not stock_codes:
-            logger.error("未配置自选股列表，请在 .env 文件中设置 STOCK_LIST")
+        # 如果指定了资产类型过滤，只处理对应类型
+        if asset_type_filter:
+            assets = [(code, atype) for code, atype in assets if atype == asset_type_filter]
+
+        if not assets:
+            asset_type_msg = f"（类型: {asset_type_filter}）" if asset_type_filter else ""
+            logger.error(f"未配置资产列表{asset_type_msg}，请在配置中设置")
             return []
 
-        logger.info(f"===== 开始分析 {len(stock_codes)} 只股票 =====")
-        logger.info(f"股票列表: {', '.join(stock_codes)}")
+        # 统计资产类型
+        stock_count = sum(1 for _, atype in assets if atype == "stock")
+        gold_count = sum(1 for _, atype in assets if atype == "gold")
+
+        logger.info(f"===== 开始分析 {len(assets)} 个资产 =====")
+        logger.info(f"股票: {stock_count} 只, 黄金: {gold_count} 个")
+        logger.info(f"资产列表: {', '.join([f'{code}({atype})' for code, atype in assets])}")
         logger.info(f"并发数: {self.max_workers}, 模式: {'仅获取数据' if dry_run else '完整分析'}")
 
         # 单股推送模式（#55）：从配置读取
         single_stock_notify = getattr(self.config, "single_stock_notify", False)
         if single_stock_notify:
-            logger.info("已启用单股推送模式：每分析完一只股票立即推送")
+            logger.info("已启用单股推送模式：每分析完一个资产立即推送")
 
         results: List[AnalysisResult] = []
 
@@ -454,37 +669,45 @@ class StockAnalysisPipeline:
         # 注意：max_workers 设置较低（默认3）以避免触发反爬
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # 提交任务
-            future_to_code = {
-                executor.submit(
-                    self.process_single_stock,
-                    code,
-                    skip_analysis=dry_run,
-                    single_stock_notify=single_stock_notify and send_notification,
-                ): code
-                for code in stock_codes
-            }
+            future_to_asset = {}
+            for code, asset_type in assets:
+                if asset_type == "gold":
+                    future = executor.submit(
+                        self.process_gold,
+                        code,
+                        skip_analysis=dry_run,
+                        single_stock_notify=single_stock_notify and send_notification,
+                    )
+                else:
+                    future = executor.submit(
+                        self.process_single_stock,
+                        code,
+                        skip_analysis=dry_run,
+                        single_stock_notify=single_stock_notify and send_notification,
+                    )
+                future_to_asset[future] = (code, asset_type)
 
             # 收集结果
-            for future in as_completed(future_to_code):
-                code = future_to_code[future]
+            for future in as_completed(future_to_asset):
+                code, asset_type = future_to_asset[future]
                 try:
                     result = future.result()
                     if result:
                         results.append(result)
                 except Exception as e:
-                    logger.error(f"[{code}] 任务执行失败: {e}")
+                    logger.error(f"[{code}({asset_type})] 任务执行失败: {e}")
 
         # 统计
         elapsed_time = time.time() - start_time
 
         # dry-run 模式下，数据获取成功即视为成功
         if dry_run:
-            # 检查哪些股票的数据今天已存在
-            success_count = sum(1 for code in stock_codes if self.db.has_today_data(code))
-            fail_count = len(stock_codes) - success_count
+            # 检查哪些资产的数据今天已存在
+            success_count = sum(1 for code, _ in assets if self.db.has_today_data(code))
+            fail_count = len(assets) - success_count
         else:
             success_count = len(results)
-            fail_count = len(stock_codes) - success_count
+            fail_count = len(assets) - success_count
 
         logger.info(f"===== 分析完成 =====")
         logger.info(f"成功: {success_count}, 失败: {fail_count}, 耗时: {elapsed_time:.2f} 秒")

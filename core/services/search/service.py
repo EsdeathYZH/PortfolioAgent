@@ -232,13 +232,71 @@ class SearchService:
 
         return results
 
+    def search_gold_intel(self, max_searches: int = 3) -> Dict[str, SearchResponse]:
+        """
+        搜索黄金相关情报
+
+        搜索维度：
+        1. 最新消息：黄金价格、市场动态
+        2. 基本面：美联储政策、通胀数据、美元指数
+        3. 地缘政治：风险事件、国际局势
+
+        Args:
+            max_searches: 最大搜索次数
+
+        Returns:
+            Dict[str, SearchResponse]: 各维度搜索结果
+        """
+        results = {}
+        search_count = 0
+
+        # 定义搜索维度
+        search_dimensions = [
+            {"name": "latest_news", "query": "黄金价格 黄金市场 最新消息 2026年", "desc": "最新消息"},
+            {"name": "fed_policy", "query": "美联储利率决议 美联储政策 黄金 2026年", "desc": "美联储政策"},
+            {"name": "geopolitical", "query": "地缘政治风险 国际局势 黄金避险 2026年", "desc": "地缘政治"},
+        ]
+
+        logger.info("开始黄金情报搜索")
+
+        # 轮流使用不同的搜索引擎
+        provider_index = 0
+
+        for dim in search_dimensions:
+            if search_count >= max_searches:
+                break
+
+            # 选择搜索引擎（轮流使用）
+            available_providers = [p for p in self._providers if p.is_available]
+            if not available_providers:
+                break
+
+            provider = available_providers[provider_index % len(available_providers)]
+            provider_index += 1
+
+            logger.info(f"[黄金情报] {dim['desc']}: 使用 {provider.name}")
+
+            response = provider.search(dim["query"], max_results=5)
+            results[dim["name"]] = response
+            search_count += 1
+
+            if response.success:
+                logger.info(f"[黄金情报] {dim['desc']}: 获取 {len(response.results)} 条结果")
+            else:
+                logger.warning(f"[黄金情报] {dim['desc']}: 搜索失败 - {response.error_message}")
+
+            # 短暂延迟避免请求过快
+            time.sleep(0.5)
+
+        return results
+
     def format_intel_report(self, intel_results: Dict[str, SearchResponse], stock_name: str) -> str:
         """
         格式化情报搜索结果为报告
 
         Args:
             intel_results: 多维度搜索结果
-            stock_name: 股票名称
+            stock_name: 股票名称或资产名称
 
         Returns:
             格式化的情报报告文本
@@ -257,7 +315,7 @@ class SearchService:
             else:
                 lines.append("  未找到相关消息")
 
-        # 风险排查
+        # 风险排查（股票专用）
         if "risk_check" in intel_results:
             resp = intel_results["risk_check"]
             lines.append(f"\n⚠️ 风险排查 (来源: {resp.provider}):")
@@ -268,7 +326,7 @@ class SearchService:
             else:
                 lines.append("  未发现明显风险信号")
 
-        # 业绩预期
+        # 业绩预期（股票专用）
         if "earnings" in intel_results:
             resp = intel_results["earnings"]
             lines.append(f"\n📊 业绩预期 (来源: {resp.provider}):")
@@ -278,6 +336,30 @@ class SearchService:
                     lines.append(f"     {r.snippet[:100]}...")
             else:
                 lines.append("  未找到业绩相关信息")
+
+        # 美联储政策（黄金专用）
+        if "fed_policy" in intel_results:
+            resp = intel_results["fed_policy"]
+            lines.append(f"\n🏦 美联储政策 (来源: {resp.provider}):")
+            if resp.success and resp.results:
+                for i, r in enumerate(resp.results[:3], 1):
+                    date_str = f" [{r.published_date}]" if r.published_date else ""
+                    lines.append(f"  {i}. {r.title}{date_str}")
+                    lines.append(f"     {r.snippet[:100]}...")
+            else:
+                lines.append("  未找到美联储政策相关信息")
+
+        # 地缘政治（黄金专用）
+        if "geopolitical" in intel_results:
+            resp = intel_results["geopolitical"]
+            lines.append(f"\n🌍 地缘政治 (来源: {resp.provider}):")
+            if resp.success and resp.results:
+                for i, r in enumerate(resp.results[:3], 1):
+                    date_str = f" [{r.published_date}]" if r.published_date else ""
+                    lines.append(f"  {i}. {r.title}{date_str}")
+                    lines.append(f"     {r.snippet[:100]}...")
+            else:
+                lines.append("  未找到地缘政治相关信息")
 
         return "\n".join(lines)
 

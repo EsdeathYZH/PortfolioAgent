@@ -52,4 +52,14 @@ def parse_arguments() -> argparse.Namespace:
         "--webui-only", action="store_true", help="仅启动 WebUI 服务，不自动执行分析（通过 /analysis API 手动触发）"
     )
 
+    parser.add_argument("--commodity-only", action="store_true", help="仅分析商品（黄金），跳过股票和大盘复盘")
+
+    parser.add_argument(
+        "--asset-type",
+        type=str,
+        choices=["stock", "gold", "all"],
+        default="all",
+        help="指定分析的资产类型：stock(仅股票), gold(仅黄金), all(全部，默认)",
+    )
+
     return parser.parse_args()

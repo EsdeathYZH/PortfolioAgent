@@ -304,18 +304,22 @@ class AkshareFetcher(BaseFetcher):
         从 Akshare 获取原始数据
 
         根据代码类型自动选择 API：
+        - 黄金（"AU"）：使用 ak.futures_zh_daily_sina() 获取黄金期货数据
         - 普通股票：使用 ak.stock_zh_a_hist()
         - ETF 基金：使用 ak.fund_etf_hist_em()
+        - 港股：使用 ak.stock_hk_hist()
 
         流程：
-        1. 判断代码类型（股票/ETF）
+        1. 判断代码类型（股票/ETF/港股/黄金）
         2. 设置随机 User-Agent
         3. 执行速率限制（随机休眠）
         4. 调用对应的 akshare API
         5. 处理返回数据
         """
         # 根据代码类型选择不同的获取方法
-        if _is_hk_code(stock_code):
+        if stock_code.upper() == "AU":
+            return self._fetch_gold_data(stock_code, start_date, end_date)
+        elif _is_hk_code(stock_code):
             return self._fetch_hk_data(stock_code, start_date, end_date)
         elif _is_etf_code(stock_code):
             return self._fetch_etf_data(stock_code, start_date, end_date)
@@ -444,6 +448,125 @@ class AkshareFetcher(BaseFetcher):
 
             raise DataFetchError(f"Akshare 获取 ETF 数据失败: {e}") from e
 
+    def _fetch_gold_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """
+        获取黄金期货数据
+
+        数据来源：ak.futures_zh_daily_sina()
+        使用上海期货交易所黄金主力合约
+
+        Args:
+            stock_code: 黄金代码（"AU"）
+            start_date: 开始日期，格式 'YYYY-MM-DD'
+            end_date: 结束日期，格式 'YYYY-MM-DD'
+
+        Returns:
+            黄金期货历史数据 DataFrame
+        """
+        import time as _time
+        from datetime import datetime
+
+        import akshare as ak
+
+        # 防封禁策略 1: 随机 User-Agent
+        self._set_random_user_agent()
+
+        # 防封禁策略 2: 强制休眠
+        self._enforce_rate_limit()
+
+        # 获取主力合约代码
+        def _get_main_contract() -> str:
+            """获取黄金主力合约代码"""
+            try:
+                # 根据当前日期推算合约月份
+                now = datetime.now()
+                year = now.year % 100  # 年份后两位
+                month = now.month
+
+                # 黄金期货合约月份：1, 3, 5, 7, 9, 11, 12
+                contract_months = [1, 3, 5, 7, 9, 11, 12]
+
+                # 找到大于等于当前月份的最小合约月份
+                available_months = [m for m in contract_months if m >= month]
+
+                if available_months:
+                    # 如果当前月份有可用合约，使用最近的
+                    next_month = min(available_months)
+                    contract_year = year
+                else:
+                    # 如果当前月份已经过了所有合约月份，使用下一年的1月
+                    next_month = 1
+                    contract_year = (year + 1) % 100
+
+                # 生成合约代码：au + 年份后两位 + 月份（两位）
+                contract_code = f"au{contract_year:02d}{next_month:02d}"
+                logger.info(f"使用黄金期货合约代码: {contract_code} (当前日期: {now.strftime('%Y-%m')})")
+                return contract_code
+            except Exception as e:
+                logger.warning(f"获取主力合约失败，使用默认合约: {e}")
+                now = datetime.now()
+                year = now.year % 100
+                month = 12  # 默认使用12月合约
+                return f"au{year:02d}{month:02d}"
+
+        contract_code = _get_main_contract()
+
+        logger.info(
+            f"[API调用] ak.futures_zh_daily_sina(symbol={contract_code}, "
+            f"start_date={start_date.replace('-', '')}, end_date={end_date.replace('-', '')})"
+        )
+
+        try:
+            api_start = _time.time()
+
+            # 调用 akshare 获取黄金期货数据
+            df = ak.futures_zh_daily_sina(symbol=contract_code)
+
+            api_elapsed = _time.time() - api_start
+
+            if df is None or df.empty:
+                logger.warning(f"[API返回] ak.futures_zh_daily_sina 返回空数据, 耗时 {api_elapsed:.2f}s")
+                raise DataFetchError(f"Akshare 获取黄金数据为空")
+
+            logger.info(f"[API返回] ak.futures_zh_daily_sina 原始数据: {len(df)} 行, " f"耗时 {api_elapsed:.2f}s")
+            logger.debug(f"[API返回] 原始列名: {list(df.columns)}")
+
+            # 过滤日期范围（在标准化之前，因为列名可能还是中文）
+            date_col = None
+            for col in df.columns:
+                if "日期" in str(col) or "date" in str(col).lower():
+                    date_col = col
+                    break
+
+            if date_col:
+                try:
+                    df[date_col] = pd.to_datetime(df[date_col])
+                    start_dt = pd.to_datetime(start_date)
+                    end_dt = pd.to_datetime(end_date)
+
+                    df = df[(df[date_col] >= start_dt) & (df[date_col] <= end_dt)]
+                    logger.info(f"[API返回] 日期过滤后: {len(df)} 行数据")
+                except Exception as e:
+                    logger.warning(f"日期过滤失败: {e}，使用全部数据")
+
+            if df.empty:
+                logger.warning(f"[API返回] 日期过滤后数据为空")
+                raise DataFetchError(f"Akshare 获取黄金数据在日期范围内为空")
+
+            logger.debug(f"[API返回] 最终列名: {list(df.columns)}")
+
+            return df
+
+        except Exception as e:
+            error_msg = str(e).lower()
+
+            # 检测反爬封禁
+            if any(keyword in error_msg for keyword in ["banned", "blocked", "频率", "rate", "限制"]):
+                logger.warning(f"检测到可能被封禁: {e}")
+                raise RateLimitError(f"Akshare 可能被限流: {e}") from e
+
+            raise DataFetchError(f"Akshare 获取黄金数据失败: {e}") from e
+
     def _fetch_hk_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
         获取港股历史数据
@@ -520,31 +643,79 @@ class AkshareFetcher(BaseFetcher):
 
         需要映射到标准列名：
         date, open, high, low, close, volume, amount, pct_chg
+
+        注意：黄金期货数据的列名可能与股票数据略有不同，需要兼容处理
         """
         df = df.copy()
 
+        # 判断是否为黄金数据
+        is_gold = stock_code.upper() == "AU"
+
         # 列名映射（Akshare 中文列名 -> 标准英文列名）
+        # 支持多种可能的列名格式
         column_mapping = {
             "日期": "date",
+            "date": "date",
             "开盘": "open",
+            "open": "open",
             "收盘": "close",
+            "close": "close",
             "最高": "high",
+            "high": "high",
             "最低": "low",
+            "low": "low",
             "成交量": "volume",
+            "volume": "volume",
             "成交额": "amount",
+            "amount": "amount",
             "涨跌幅": "pct_chg",
+            "pct_chg": "pct_chg",
+            "change": "pct_chg",
         }
 
-        # 重命名列
-        df = df.rename(columns=column_mapping)
+        # 重命名列（只重命名存在的列）
+        df = df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns})
 
-        # 添加股票代码列
+        # 确保日期列存在
+        if "date" not in df.columns:
+            # 尝试从其他日期列转换
+            for col in df.columns:
+                if "日期" in str(col) or "date" in str(col).lower():
+                    df["date"] = pd.to_datetime(df[col])
+                    break
+
+        # 添加代码列
         df["code"] = stock_code
 
-        # 只保留需要的列
+        # 对于黄金数据，如果缺少某些列，尝试计算或填充
+        if is_gold:
+            # 如果缺少成交额，尝试计算（成交量 * 收盘价）
+            if "amount" not in df.columns and "volume" in df.columns and "close" in df.columns:
+                df["amount"] = df["volume"] * df["close"]
+                logger.debug("黄金数据：计算成交额 = 成交量 * 收盘价")
+
+            # 如果缺少涨跌幅，尝试计算
+            if "pct_chg" not in df.columns and "close" in df.columns:
+                # 计算涨跌幅：((今日收盘 - 昨日收盘) / 昨日收盘) * 100
+                df["pct_chg"] = df["close"].pct_change() * 100
+                df["pct_chg"] = df["pct_chg"].fillna(0.0)
+                logger.debug("黄金数据：计算涨跌幅")
+
+        # 只保留需要的列，但允许缺少部分列（会在后续处理中填充）
         keep_cols = ["code"] + STANDARD_COLUMNS
         existing_cols = [col for col in keep_cols if col in df.columns]
-        df = df[existing_cols]
+
+        # 如果缺少必需列，添加空列（使用默认值）
+        for col in keep_cols:
+            if col not in df.columns and col != "code":
+                if col == "amount":
+                    df[col] = 0.0
+                elif col == "pct_chg":
+                    df[col] = 0.0
+                else:
+                    df[col] = None
+
+        df = df[keep_cols]
 
         return df
 
