@@ -1,4 +1,4 @@
-name: 每日股票分析
+name: Daily analysis
 
 on:
   # 定时触发 - 每天北京时间 18:00 (UTC 10:00)
@@ -41,7 +41,7 @@ jobs:
         run: |
           mkdir -p data logs reports
 
-      - name: 执行股票分析
+      - name: 执行标的池分析
         env:
           # ==================== 多用户配置（必需）====================
           # 用户列表（例如：USERS=allen,hong）

@@ -1,278 +1,381 @@
-# 📈 A股智能分析系统
+# 🤖 PortfolioAgent
 
-[![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/daily_stock_analysis?style=social)](https://github.com/ZhuLinsen/daily_stock_analysis/stargazers)
-[![CI](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
+An intelligent AI-powered portfolio analysis agent for A-share stocks. PortfolioAgent automates your daily stock analysis workflow, providing comprehensive market reviews and actionable trading insights to help you make informed investment decisions.
 
-> 🤖 基于 AI 大模型的 A/H 股自选股智能分析系统，每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/邮箱
+> **Your AI trading assistant that works 24/7** - Automatically analyzes your watchlist, monitors market conditions, and delivers insights directly to your preferred channels.
 
-![运行效果演示](./sources/all_2026-01-13_221547.gif)
+## ✨ Features
 
-## ✨ 功能特性
+- 🤖 **AI-Powered Analysis**: Uses Google Gemini or OpenAI-compatible APIs for intelligent stock analysis
+- 📊 **Multi-Data Source Support**: Integrates with AkShare, Tushare, Baostock, YFinance, and efinance
+- 🔔 **Multi-Channel Notifications**: Supports WeChat, Feishu, Telegram, Email, Pushover, ServerChan, and custom webhooks
+- 👥 **Multi-User Support**: Configure multiple users with individual stock watchlists and notification preferences
+- 🌐 **WebUI Interface**: Web-based management interface for configuration and manual analysis triggers
+- 📈 **Market Review**: Daily market overview and sentiment analysis
+- 🔍 **News Integration**: Real-time news search using Tavily, Bocha, or SerpAPI
+- 🐳 **Docker Support**: Easy deployment with Docker Compose
+- ⚡ **GitHub Actions**: Free automated execution on GitHub Actions (no server required)
+- 📱 **Feishu Cloud Docs**: Automatic generation of daily analysis reports in Feishu cloud documents
 
-### 🎯 核心功能
-- **AI 决策仪表盘** - 一句话核心结论 + 精确买卖点位 + 检查清单
-- **多维度分析** - 技术面 + 筹码分布 + 舆情情报 + 实时行情
-- **大盘复盘** - 每日市场概览、板块涨跌、北向资金
-- **多渠道推送** - 支持企业微信、飞书、Telegram、邮件（自动识别）
-- **零成本部署** - GitHub Actions 免费运行，无需服务器
-- **💰 白嫖 Gemini API** - Google AI Studio 提供免费额度，个人使用完全够用
-- **🔄 多模型支持** - 支持 OpenAI 兼容 API（DeepSeek、通义千问等）作为备选
+## 🏗️ Architecture
 
-### 📊 数据来源
-- **行情数据**: AkShare（免费）、Tushare、Baostock、YFinance
-- **新闻搜索**: Tavily、SerpAPI、Bocha
-- **AI 分析**:
-  - 主力：Google Gemini（gemini-3-flash-preview）—— [免费获取](https://aistudio.google.com/)
-  - 备选：应大家要求，也支持了OpenAI 兼容 API（DeepSeek、通义千问、Moonshot 等）
+The project follows a clean architecture pattern:
 
-### 🛡️ 交易理念内置
-- ❌ **严禁追高** - 乖离率 > 5% 自动标记「危险」
-- ✅ **趋势交易** - MA5 > MA10 > MA20 多头排列
-- 📍 **精确点位** - 买入价、止损价、目标价
-- 📋 **检查清单** - 每项条件用 ✅⚠️❌ 标记
-
-## 🚀 快速开始
-
-### 方式一：GitHub Actions（推荐，零成本）
-
-**无需服务器，每天自动运行！**
-
-#### 1. Fork 本仓库(顺便点下⭐呀)
-
-点击右上角 `Fork` 按钮
-
-#### 2. 配置 Secrets
-
-进入你 Fork 的仓库 → `Settings` → `Secrets and variables` → `Actions` → `New repository secret`
-
-**AI 模型配置（二选一）**
-
-| Secret 名称 | 说明 | 必填 |
-|------------|------|:----:|
-| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/) 获取免费 Key | ✅* |
-| `OPENAI_API_KEY` | OpenAI 兼容 API Key（支持 DeepSeek、通义千问等） | 可选 |
-| `OPENAI_BASE_URL` | OpenAI 兼容 API 地址（如 `https://api.deepseek.com/v1`） | 可选 |
-| `OPENAI_MODEL` | 模型名称（如 `deepseek-chat`） | 可选 |
-
-> *注：`GEMINI_API_KEY` 和 `OPENAI_API_KEY` 至少配置一个
-
-**通知渠道配置（可同时配置多个，全部推送）**
-
-| Secret 名称 | 说明 | 必填 |
-|------------|------|:----:|
-| `WECHAT_WEBHOOK_URL` | 企业微信 Webhook URL | 可选 |
-| `FEISHU_WEBHOOK_URL` | 飞书 Webhook URL | 可选 |
-| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token（@BotFather 获取） | 可选 |
-| `TELEGRAM_CHAT_ID` | Telegram Chat ID | 可选 |
-| `EMAIL_SENDER` | 发件人邮箱（如 `xxx@qq.com`） | 可选 |
-| `EMAIL_PASSWORD` | 邮箱授权码（非登录密码） | 可选 |
-| `EMAIL_RECEIVERS` | 收件人邮箱（多个用逗号分隔，留空则发给自己） | 可选 |
-| `CUSTOM_WEBHOOK_URLS` | 自定义 Webhook（支持钉钉等，多个用逗号分隔） | 可选 |
-| `CUSTOM_WEBHOOK_BEARER_TOKEN` | 自定义 Webhook 的 Bearer Token（用于需要认证的 Webhook） | 可选 |
-| `SINGLE_STOCK_NOTIFY` | 单股推送模式：设为 `true` 则每分析完一只股票立即推送 | 可选 |
-
-> *注：至少配置一个渠道，配置多个则同时推送
->
-> 📖 更多配置（Pushover 手机推送、飞书云文档等）请参考 [完整配置指南](docs/full-guide.md)
-
-**其他配置**
-
-| Secret 名称 | 说明 | 必填 |
-|------------|------|:----:|
-| `STOCK_LIST` | 自选股代码，如 `600519,300750,002594` | ✅ |
-| `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) 搜索 API（新闻搜索） | 推荐 |
-| `BOCHA_API_KEYS` | [博查搜索](https://open.bocha.cn/) Web Search API（中文搜索优化，支持AI摘要，多个key用逗号分隔） | 可选 |
-| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/) 备用搜索 | 可选 |
-| `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) Token | 可选 |
-
-#### 3. 启用 Actions
-
-进入 `Actions` 标签 → 点击 `I understand my workflows, go ahead and enable them`
-
-#### 4. 手动测试
-
-`Actions` → `每日股票分析` → `Run workflow` → 选择模式 → `Run workflow`
-
-#### 5. 完成！
-
-默认每个工作日 **18:00（北京时间）** 自动执行
-
-### 方式二：本地运行 / Docker 部署
-
-> 📖 本地运行、Docker 部署详细步骤请参考 [完整配置指南](docs/full-guide.md)
-
-## 📱 推送效果
-
-### 决策仪表盘
 ```
-📊 2026-01-10 决策仪表盘
-3只股票 | 🟢买入:1 🟡观望:2 🔴卖出:0
+PortfolioAgent/
+├── common/              # Shared utilities and configuration
+├── core/                # Core business logic
+│   ├── domain/         # Domain models (Analysis, Signal, User, etc.)
+│   └── services/       # Business services
+│       ├── analysis/   # Stock analysis pipeline
+│       ├── advice/     # Trading advice engine
+│       ├── backtest/  # Backtesting engine
+│       ├── notification/ # Notification service
+│       ├── search/     # News search service
+│       └── user/       # User configuration management
+├── infrastructure/     # External integrations
+│   ├── ai/            # AI model integrations (Gemini, OpenAI)
+│   ├── data/          # Data persistence (SQLite)
+│   ├── external/      # External services (Feishu API)
+│   └── fetchers/      # Data source fetchers
+└── presentation/      # User interfaces
+    ├── cli/           # Command-line interface
+    ├── scheduler/     # Task scheduling
+    └── web/           # Web UI
+```
 
-🟢 买入 | 贵州茅台(600519)
-📌 缩量回踩MA5支撑，乖离率1.2%处于最佳买点
-💰 狙击: 买入1800 | 止损1750 | 目标1900
-✅多头排列 ✅乖离安全 ✅量能配合
+## 🚀 Quick Start
 
-🟡 观望 | 宁德时代(300750)
-📌 乖离率7.8%超过5%警戒线，严禁追高
-⚠️ 等待回调至MA5附近再考虑
+### Prerequisites
+
+- Python 3.10+ (3.12 recommended)
+- API Keys:
+  - **Required**: Gemini API Key ([Get it here](https://aistudio.google.com/)) or OpenAI-compatible API
+  - **Recommended**: Tavily API Key for news search ([Get it here](https://tavily.com/))
+  - **Optional**: Tushare Token for premium data
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd PortfolioAgent
+   ```
+
+2. **Create virtual environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure environment variables**
+
+   Create a `.env` file in the project root:
+   ```env
+   # Required: AI Model (at least one)
+   GEMINI_API_KEY=your_gemini_api_key
+
+   # Required: Stock Watchlist
+   STOCK_LIST=600519,300750,002594
+
+   # Required: At least one notification channel
+   WECHAT_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+   # OR
+   FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+   # OR
+   TELEGRAM_BOT_TOKEN=xxx
+   TELEGRAM_CHAT_ID=xxx
+   # OR
+   EMAIL_SENDER=your_email@example.com
+   EMAIL_PASSWORD=your_email_auth_code
+
+   # Recommended: News Search
+   TAVILY_API_KEYS=your_tavily_api_key
+   ```
+
+5. **Run the analysis**
+   ```bash
+   python main.py
+   ```
+
+## 📖 Usage
+
+### Command Line Options
+
+```bash
+# Full analysis (stocks + market review)
+python main.py
+
+# Market review only
+python main.py --market-review
+
+# Stocks only (no market review)
+python main.py --no-market-review
+
+# Analyze specific stocks
+python main.py --stocks 600519,300750
+
+# Dry run (fetch data only, no AI analysis)
+python main.py --dry-run
+
+# No notifications
+python main.py --no-notify
+
+# Schedule mode (runs daily at configured time)
+python main.py --schedule
+
+# Debug mode (verbose logging)
+python main.py --debug
+
+# Custom worker count
+python main.py --workers 5
+
+# WebUI mode (with analysis)
+python main.py --webui
+
+# WebUI only (manual trigger)
+python main.py --webui-only
+```
+
+### WebUI Interface
+
+Start the WebUI:
+```bash
+python main.py --webui-only
+```
+
+Then access `http://localhost:8000` in your browser.
+
+**Features:**
+- 📝 View and edit stock watchlist
+- 🚀 Trigger analysis for specific stocks
+- 📊 View analysis task status
+- 🔗 RESTful API endpoints
+
+**API Endpoints:**
+- `GET /` - Configuration management page
+- `GET /health` - Health check
+- `GET /analysis?code=600519` - Trigger analysis for a stock
+- `GET /tasks` - List all analysis tasks
+- `GET /task?id=xxx` - Get task status
+
+## 🔧 Configuration
+
+### Environment Variables
+
+#### AI Model Configuration
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GEMINI_API_KEY` | Google Gemini API Key | ✅* |
+| `GEMINI_MODEL` | Gemini model name (default: `gemini-3-flash-preview`) | No |
+| `OPENAI_API_KEY` | OpenAI-compatible API Key | Optional |
+| `OPENAI_BASE_URL` | OpenAI-compatible API base URL | Optional |
+| `OPENAI_MODEL` | OpenAI model name (default: `gpt-4o-mini`) | Optional |
+
+> *At least one AI model (Gemini or OpenAI) is required.
+
+#### Notification Channels
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `WECHAT_WEBHOOK_URL` | WeChat Work webhook URL | Optional* |
+| `FEISHU_WEBHOOK_URL` | Feishu webhook URL | Optional* |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token | Optional* |
+| `TELEGRAM_CHAT_ID` | Telegram chat ID | Optional* |
+| `EMAIL_SENDER` | Email sender address | Optional* |
+| `EMAIL_PASSWORD` | Email auth code (not password) | Optional* |
+| `EMAIL_RECEIVERS` | Email recipients (comma-separated) | Optional |
+| `PUSHOVER_USER_KEY` | Pushover user key | Optional* |
+| `PUSHOVER_API_TOKEN` | Pushover API token | Optional* |
+| `SERVERCHAN_SEND_KEY` | ServerChan API key | Optional* |
+| `CUSTOM_WEBHOOK_URLS` | Custom webhook URLs (comma-separated) | Optional* |
+| `CUSTOM_WEBHOOK_BEARER_TOKEN` | Bearer token for custom webhooks | Optional |
+| `SINGLE_STOCK_NOTIFY` | Send notification per stock (default: `false`) | Optional |
+
+> *At least one notification channel is required.
+
+#### Feishu Cloud Documents (Optional)
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `FEISHU_APP_ID` | Feishu app ID | Optional |
+| `FEISHU_APP_SECRET` | Feishu app secret | Optional |
+| `FEISHU_FOLDER_TOKEN` | Feishu cloud folder token | Optional |
+
+#### Search Services
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `TAVILY_API_KEYS` | Tavily API keys (comma-separated) | Recommended |
+| `BOCHA_API_KEYS` | Bocha API keys (comma-separated) | Optional |
+| `SERPAPI_API_KEYS` | SerpAPI keys (comma-separated) | Optional |
+
+#### Data Sources
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `TUSHARE_TOKEN` | Tushare Pro token | Optional |
+
+#### System Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `STOCK_LIST` | Stock codes (comma-separated) | - |
+| `MAX_WORKERS` | Concurrent threads | `3` |
+| `MARKET_REVIEW_ENABLED` | Enable market review | `true` |
+| `SCHEDULE_ENABLED` | Enable scheduled tasks | `false` |
+| `SCHEDULE_TIME` | Daily execution time (HH:MM) | `18:00` |
+| `WEBUI_ENABLED` | Enable WebUI | `false` |
+| `WEBUI_HOST` | WebUI host | `127.0.0.1` |
+| `WEBUI_PORT` | WebUI port | `8000` |
+| `LOG_DIR` | Log directory | `./logs` |
+
+### Multi-User Configuration
+
+The system supports multiple users with individual configurations:
+
+```env
+# List of users (comma-separated)
+USERS=user1,user2
+
+# User 1 configuration
+USER_user1_STOCKS=600519,300750
+USER_user1_WECHAT_WEBHOOK_URL=https://...
+USER_user1_FEISHU_WEBHOOK_URL=https://...
+
+# User 2 configuration
+USER_user2_STOCKS=000001,002594
+USER_user2_TELEGRAM_BOT_TOKEN=xxx
+USER_user2_TELEGRAM_CHAT_ID=xxx
+```
+
+## 🐳 Docker Deployment
+
+### Quick Start
+
+```bash
+# Build and start
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+### Service Modes
+
+| Service | Description | Port |
+|---------|-------------|------|
+| `analyzer` | Scheduled task mode | - |
+| `webui` | WebUI mode (manual trigger) | 8000 |
+
+### Run Both Modes
+
+```bash
+docker-compose up -d analyzer webui
+```
+
+## ☁️ GitHub Actions Deployment
+
+Deploy PortfolioAgent for free on GitHub Actions (no server required):
+
+1. **Fork the repository**
+
+2. **Configure Secrets**
+
+   Go to `Settings` → `Secrets and variables` → `Actions` → `New repository secret`
+
+   Add required secrets:
+   - `GEMINI_API_KEY`
+   - `STOCK_LIST`
+   - At least one notification channel
+   - `TAVILY_API_KEYS` (recommended)
+
+3. **Enable Actions**
+
+   Go to `Actions` tab → Enable workflows
+
+4. **Manual Test**
+
+   Go to `Actions` → `Run workflow` → Select mode → Run
+
+5. **Schedule**
+
+   Default: Weekdays at 18:00 (Beijing time)
+
+   Edit `.github/workflows/daily_analysis.yml` to customize:
+   ```yaml
+   schedule:
+     - cron: '0 10 * * 1-5'  # UTC time (+8 = Beijing time)
+   ```
+
+## 📊 Analysis Features
+
+### Stock Analysis
+
+- **Technical Analysis**: MA trends, volume analysis, pattern recognition
+- **Fundamental Analysis**: Sector position, company highlights
+- **Sentiment Analysis**: News summary, market sentiment, hot topics
+- **Trading Advice**: Buy/sell/hold recommendations with confidence levels
+- **Risk Warnings**: Key risk points and alerts
+
+### Market Review
+
+- Daily market overview
+- Sector rotation analysis
+- Market sentiment summary
+- Key events and news
+
+### Decision Dashboard
+
+Each analysis includes a structured decision dashboard:
+- **Core Conclusion**: One-sentence summary
+- **Position Advice**: Recommendations for different positions
+- **Sniper Points**: Key price levels
+- **Action Checklist**: Pre-trade checklist
+- **Risk Alerts**: Important warnings
+
+## 🔍 Data Sources
+
+The system uses multiple data sources with automatic fallback:
+
+1. **efinance** (Priority 0) - East Money data
+2. **AkShare** (Priority 1) - Free A-share data
+3. **Tushare Pro** (Priority 2) - Premium data (requires token)
+4. **Baostock** (Priority 3) - Free backup source
+5. **YFinance** (Priority 4) - International markets
+
+## 📝 Supported Stock Formats
+
+- **A-shares**: 6-digit codes (e.g., `600519`, `000001`, `300750`)
+- **Hong Kong stocks**: `hk` prefix + 5 digits (e.g., `hk00700`, `hk09988`)
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+python -m pytest test/
+
+# Run specific test file
+python -m pytest test/test_functionality.py
+
+# Run with coverage
+python -m pytest test/ --cov=core --cov=infrastructure
+```
+
+## 📚 Documentation
+
+- [Full Configuration Guide](docs/full-guide.md) - Complete configuration reference
+- [Deployment Guide](docs/DEPLOY.md) - Detailed deployment instructions
 
 ---
-生成时间: 18:00
-```
 
-### 大盘复盘
-
-![大盘复盘推送效果](./sources/dapan_2026-01-13_22-14-52.png)
-
-```
-🎯 2026-01-10 大盘复盘
-
-📊 主要指数
-- 上证指数: 3250.12 (🟢+0.85%)
-- 深证成指: 10521.36 (🟢+1.02%)
-- 创业板指: 2156.78 (🟢+1.35%)
-
-📈 市场概况
-上涨: 3920 | 下跌: 1349 | 涨停: 155 | 跌停: 3
-
-🔥 板块表现
-领涨: 互联网服务、文化传媒、小金属
-领跌: 保险、航空机场、光伏设备
-```
-
-## ⚙️ 配置说明
-
-> 📖 完整环境变量、定时任务配置请参考 [完整配置指南](docs/full-guide.md)
-
-## 🖥️ 本地 WebUI（可选）
-
-本地运行时，可启用 WebUI 来管理配置和触发分析。
-
-### 启动方式
-
-| 命令 | 说明 |
-|------|------|
-| `python main.py --webui` | 启动 WebUI + 执行一次完整分析 |
-| `python main.py --webui-only` | 仅启动 WebUI，手动触发分析 |
-
-- 访问地址：`http://127.0.0.1:8000`
-- 详细说明请参考 [配置指南 - WebUI](docs/full-guide.md#本地-webui-管理界面)
-
-### 功能特性
-
-- 📝 **配置管理** - 查看/修改 `.env` 里的自选股列表
-- 🚀 **快速分析** - 页面输入股票代码，一键触发分析
-- 📊 **实时进度** - 分析任务状态实时更新，支持多任务并行
-
-### API 接口
-
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/` | GET | 配置管理页面 |
-| `/health` | GET | 健康检查 |
-| `/analysis?code=xxx` | GET | 触发单只股票异步分析 |
-| `/tasks` | GET | 查询所有任务状态 |
-| `/task?id=xxx` | GET | 查询单个任务状态 |
-
-## 📁 项目结构
-
-```
-daily_stock_analysis/
-├── main.py              # 主程序入口
-├── analyzer.py          # AI 分析器（Gemini）
-├── market_analyzer.py   # 大盘复盘分析
-├── search_service.py    # 新闻搜索服务
-├── notification.py      # 消息推送
-├── scheduler.py         # 定时任务
-├── storage.py           # 数据存储
-├── config.py            # 配置管理
-├── webui.py             # WebUI 入口
-├── core/                # 核心业务逻辑层
-│   ├── domain/          # 领域模型
-│   └── services/        # 业务服务
-├── infrastructure/      # 基础设施层
-│   ├── ai/              # AI模块
-│   ├── data/            # 数据层
-│   └── fetchers/        # 数据获取层
-├── presentation/        # 展示层
-│   ├── cli/             # 命令行接口
-│   └── scheduler/       # 定时任务
-├── common/              # 共享组件
-├── web/                 # WebUI 模块
-├── test/                # 测试
-├── .github/workflows/   # GitHub Actions
-├── Dockerfile           # Docker 镜像
-└── docker-compose.yml   # Docker 编排
-```
-
-## 🛠️ 开发环境设置
-
-### Pre-commit Hooks（推荐）
-
-项目使用 pre-commit 进行代码质量检查，可以在提交前自动运行检查，避免 CI 失败。
-
-#### 安装和设置
-
-```bash
-# 1. 安装 pre-commit
-pip install pre-commit
-
-# 2. 安装 Git hooks
-pre-commit install
-
-# 3. 测试运行（可选）
-pre-commit run --all-files
-```
-
-#### 功能
-
-- ✅ **自动格式化** - Black 格式化代码，isort 排序导入
-- ✅ **静态检查** - Flake8 检查严重错误（与 CI 一致）
-- ✅ **文件检查** - 检查 YAML/JSON/TOML 语法、行尾空格等
-
-#### 使用
-
-提交代码时会自动运行检查：
-
-```bash
-git add .
-git commit -m "your message"
-# hooks 会自动运行，如果有错误会阻止提交
-```
-
-## 🗺️ Roadmap
-
-> 📢 以下功能将视后续情况逐步完成，如果你有好的想法或建议，欢迎 [提交 Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues) 讨论！
-
-### 🔔 通知渠道扩展
-- [x] 企业微信机器人
-- [x] 飞书机器人
-- [x] Telegram Bot
-- [x] 邮件通知（SMTP）
-- [x] 自定义 Webhook（支持钉钉、Discord、Slack、Bark 等）
-- [x] iOS/Android 推送（Pushover）
-
-### 🤖 AI 模型支持
-- [x] Google Gemini（主力，免费额度）
-- [x] OpenAI 兼容 API（支持 GPT-4/DeepSeek/通义千问/Claude/文心一言 等）
-- [x] 本地模型（Ollama）
-
-### 📊 数据源扩展
-- [x] AkShare（免费）
-- [x] Tushare Pro
-- [x] Baostock
-- [x] YFinance
-
-### 🎯 功能增强
-- [x] 决策仪表盘
-- [x] 大盘复盘
-- [x] 定时推送
-- [x] GitHub Actions
-- [x] 港股支持
-- [x] Web 管理界面 (简易版)
-- [ ] 历史分析回测
-- [ ] 美股支持
+**PortfolioAgent** - Your intelligent portfolio analysis assistant
