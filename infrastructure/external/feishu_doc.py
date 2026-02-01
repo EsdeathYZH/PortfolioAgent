@@ -11,7 +11,7 @@ from typing import List, Optional
 import lark_oapi as lark
 from lark_oapi.api.docx.v1 import *
 
-from shared.config import get_config
+from common.config import get_config
 
 logger = logging.getLogger(__name__)
 

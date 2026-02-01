@@ -51,7 +51,7 @@ def test_config():
     """测试配置加载"""
     print_header("1. 配置加载测试")
 
-    from shared.config import get_config
+    from common.config import get_config
 
     config = get_config()
 
@@ -186,7 +186,7 @@ def test_data_fetch(stock_code: str = "600519"):
     """测试数据获取"""
     print_header("3. 数据获取测试")
 
-    from data_provider import DataFetcherManager
+    from infrastructure.fetchers import DataFetcherManager
 
     manager = DataFetcherManager()
 
@@ -223,8 +223,8 @@ def test_llm():
 
     import time
 
+    from common.config import get_config
     from infrastructure.ai import GeminiAnalyzer
-    from shared.config import get_config
 
     config = get_config()
 
@@ -334,8 +334,8 @@ def test_notification():
     """测试通知推送"""
     print_header("5. 通知推送测试")
 
+    from common.config import get_config
     from core.services.notification import NotificationService
-    from shared.config import get_config
 
     config = get_config()
     service = NotificationService()

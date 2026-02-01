@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 REM 使用venv运行测试的便捷脚本（Windows）
 
 echo ========================================

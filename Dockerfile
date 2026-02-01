@@ -26,7 +26,10 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com
 
 # 复制应用代码
 COPY *.py ./
-COPY data_provider/ ./data_provider/
+COPY core/ ./core/
+COPY infrastructure/ ./infrastructure/
+COPY common/ ./common/
+COPY presentation/ ./presentation/
 COPY web/ ./web/
 
 # 创建数据目录

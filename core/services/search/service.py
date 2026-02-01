@@ -319,7 +319,7 @@ def get_search_service() -> SearchService:
     global _search_service
 
     if _search_service is None:
-        from shared.config import get_config
+        from common.config import get_config
 
         config = get_config()
         _search_service = SearchService(

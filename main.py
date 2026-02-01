@@ -36,6 +36,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+from common.config import Config, get_config
 from core.services.analysis import MarketAnalyzer, StockAnalysisPipeline
 from core.services.notification import NotificationService
 from core.services.search import SearchService
@@ -43,7 +44,6 @@ from core.services.user import UserConfigLoader
 from infrastructure.ai import GeminiAnalyzer
 from infrastructure.external import FeishuDocManager
 from presentation.cli import parse_arguments, setup_logging
-from shared.config import Config, get_config
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +233,7 @@ def main() -> int:
 
     if start_webui:
         try:
-            from web import run_server_in_thread
+            from presentation.web import run_server_in_thread
 
             run_server_in_thread(host=config.webui_host, port=config.webui_port)
         except Exception as e:

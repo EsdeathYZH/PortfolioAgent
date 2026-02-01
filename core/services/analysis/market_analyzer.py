@@ -22,8 +22,8 @@ project_root = Path(__file__).parent.parent.parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+from common.config import get_config
 from core.services.search import SearchService
-from shared.config import get_config
 
 logger = logging.getLogger(__name__)
 

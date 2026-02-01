@@ -201,8 +201,7 @@ daily_stock_analysis/
 ├── presentation/        # 展示层
 │   ├── cli/             # 命令行接口
 │   └── scheduler/       # 定时任务
-├── shared/              # 共享组件
-├── data_provider/      # 数据源适配器（向后兼容）
+├── common/              # 共享组件
 ├── web/                 # WebUI 模块
 ├── test/                # 测试
 ├── .github/workflows/   # GitHub Actions

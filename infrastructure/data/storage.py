@@ -14,7 +14,7 @@ from sqlalchemy import and_, create_engine, desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from shared.config import get_config
+from common.config import get_config
 
 from .models import Base, StockDaily
 

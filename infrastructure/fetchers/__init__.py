@@ -2,22 +2,24 @@
 """
 数据获取层
 
-从data_provider迁移的数据获取器
+数据源策略层，实现统一的数据获取接口和自动故障切换
 """
 
-# 从data_provider导入所有内容（保持兼容）
-import sys
-from pathlib import Path
-
-project_root = Path(__file__).parent.parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-from data_provider import BaseFetcher, ChipDistribution, DataFetcherManager, RealtimeQuote
+from .akshare_fetcher import AkshareFetcher, ChipDistribution, RealtimeQuote
+from .baostock_fetcher import BaostockFetcher
+from .base import BaseFetcher, DataFetcherManager
+from .efinance_fetcher import EfinanceFetcher
+from .tushare_fetcher import TushareFetcher
+from .yfinance_fetcher import YfinanceFetcher
 
 __all__ = [
-    "DataFetcherManager",
     "BaseFetcher",
+    "DataFetcherManager",
+    "AkshareFetcher",
+    "BaostockFetcher",
+    "EfinanceFetcher",
+    "TushareFetcher",
+    "YfinanceFetcher",
     "RealtimeQuote",
     "ChipDistribution",
 ]
