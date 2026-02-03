@@ -232,8 +232,21 @@ class DataFetcherManager:
     切换策略：
     - 优先使用高优先级数据源
     - 失败后自动切换到下一个
-    - 所有数据源都失败时抛出异常
+    - 所有数据源失败后抛出异常
+
+    注意：这些数据源都支持多种资产类型（股票、ETF、港股、黄金等），
+    通过代码识别自动选择对应的 API。
     """
+
+    # 数据源支持的资产类型映射
+    # 每个数据源声明自己支持的资产类型列表
+    _fetcher_support_map = {
+        "EfinanceFetcher": ["stock", "etf"],  # 支持股票和ETF，不支持黄金
+        "AkshareFetcher": ["stock", "etf", "hk", "gold"],  # 支持所有类型
+        "TushareFetcher": ["stock"],  # 主要支持股票
+        "BaostockFetcher": ["stock"],  # 主要支持股票
+        "YfinanceFetcher": ["stock", "etf", "hk"],  # 支持股票、ETF、港股，可能也支持黄金（需要验证）
+    }
 
     def __init__(self, fetchers: Optional[List[BaseFetcher]] = None):
         """
@@ -250,6 +263,54 @@ class DataFetcherManager:
         else:
             # 默认数据源将在首次使用时延迟加载
             self._init_default_fetchers()
+
+    def _get_asset_type(self, stock_code: str) -> str:
+        """
+        识别资产类型
+
+        Args:
+            stock_code: 资产代码
+
+        Returns:
+            资产类型："stock", "etf", "hk", "gold"
+        """
+        code_upper = stock_code.upper()
+
+        # 黄金代码
+        if code_upper == "AU":
+            return "gold"
+
+        # 港股代码（5位数字，或带 hk 前缀）
+        if code_upper.startswith("HK") or (code_upper.isdigit() and len(code_upper) == 5):
+            return "hk"
+
+        # ETF 代码
+        etf_prefixes = ("51", "52", "56", "58", "15", "16", "18")
+        if stock_code.startswith(etf_prefixes) and len(stock_code) == 6:
+            return "etf"
+
+        # 默认是股票
+        return "stock"
+
+    def _is_fetcher_supported(self, fetcher: BaseFetcher, asset_type: str) -> bool:
+        """
+        检查数据源是否支持指定的资产类型
+
+        Args:
+            fetcher: 数据源实例
+            asset_type: 资产类型
+
+        Returns:
+            True 表示支持，False 表示不支持
+        """
+        supported_types = self._fetcher_support_map.get(fetcher.name, [])
+
+        # 如果没有在映射表中找到，默认支持（向后兼容）
+        if not supported_types:
+            logger.debug(f"[{fetcher.name}] 未在支持映射表中，默认支持所有类型")
+            return True
+
+        return asset_type in supported_types
 
     def _init_default_fetchers(self) -> None:
         """
@@ -312,10 +373,12 @@ class DataFetcherManager:
         获取日线数据（自动切换数据源）
 
         故障切换策略：
-        1. 从最高优先级数据源开始尝试
-        2. 捕获异常后自动切换到下一个
-        3. 记录每个数据源的失败原因
-        4. 所有数据源失败后抛出详细异常
+        1. 识别资产类型
+        2. 过滤不支持该资产类型的数据源
+        3. 从最高优先级数据源开始尝试
+        4. 捕获异常后自动切换到下一个
+        5. 记录每个数据源的失败原因
+        6. 所有数据源失败后抛出详细异常
 
         支持的资产类型：
         - 股票代码（如 "600519", "000001"）
@@ -337,9 +400,20 @@ class DataFetcherManager:
         Raises:
             DataFetchError: 所有数据源都失败时抛出
         """
+        # 识别资产类型
+        asset_type = self._get_asset_type(stock_code)
+        logger.debug(f"识别资产类型: {stock_code} -> {asset_type}")
+
         errors = []
+        skipped_fetchers = []
 
         for fetcher in self._fetchers:
+            # 先检查数据源是否支持该资产类型
+            if not self._is_fetcher_supported(fetcher, asset_type):
+                logger.debug(f"[{fetcher.name}] 不支持 {asset_type} 类型资产，跳过 {stock_code}")
+                skipped_fetchers.append(fetcher.name)
+                continue
+
             try:
                 logger.info(f"尝试使用 [{fetcher.name}] 获取 {stock_code}...")
                 df = fetcher.get_daily_data(stock_code=stock_code, start_date=start_date, end_date=end_date, days=days)
@@ -355,8 +429,15 @@ class DataFetcherManager:
                 # 继续尝试下一个数据源
                 continue
 
-        # 所有数据源都失败
-        error_summary = f"所有数据源获取 {stock_code} 失败:\n" + "\n".join(errors)
+        # 构建错误摘要
+        error_parts = []
+        if skipped_fetchers:
+            error_parts.append(f"跳过的数据源（不支持 {asset_type}）: {', '.join(skipped_fetchers)}")
+        if errors:
+            error_parts.append("尝试失败的数据源:")
+            error_parts.extend(f"  - {err}" for err in errors)
+
+        error_summary = f"所有数据源获取 {stock_code} 失败:\n" + "\n".join(error_parts)
         logger.error(error_summary)
         raise DataFetchError(error_summary)
 

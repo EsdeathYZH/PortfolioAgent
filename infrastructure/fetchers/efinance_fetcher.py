@@ -192,6 +192,8 @@ class EfinanceFetcher(BaseFetcher):
         - 普通股票：使用 ef.stock.get_quote_history()
         - ETF 基金：使用 ef.fund.get_quote_history()
 
+        注意：黄金（"AU"）不支持，DataFetcherManager 会自动跳过此数据源
+
         流程：
         1. 判断代码类型（股票/ETF）
         2. 设置随机 User-Agent
