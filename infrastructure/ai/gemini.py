@@ -10,7 +10,9 @@ import logging
 
 # 导入依赖
 import sys
+import threading
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -53,6 +55,133 @@ STOCK_NAME_MAP = {
 logger = logging.getLogger(__name__)
 
 
+class RateLimiter:
+    """
+    线程安全的速率限制器（令牌桶算法）
+
+    用于控制 API 请求频率，避免触发限流错误（如 429）。
+
+    特性：
+    - 线程安全：支持多线程并发调用
+    - 滑动窗口：基于时间窗口的请求计数
+    - 自动等待：当达到限制时自动等待直到可以发送请求
+    - 可配置：支持自定义每分钟请求数和最小间隔
+
+    使用示例：
+        limiter = RateLimiter(requests_per_minute=6, min_interval=10.0)
+        limiter.wait_if_needed()  # 请求前调用
+        # ... 执行 API 请求 ...
+        limiter.record_request()  # 请求后调用
+    """
+
+    def __init__(self, requests_per_minute: int = 6, min_interval: float = 10.0, enabled: bool = True):
+        """
+        初始化速率限制器
+
+        Args:
+            requests_per_minute: 每分钟最大请求数（默认 6）
+            min_interval: 请求之间的最小间隔（秒，默认 10 秒）
+            enabled: 是否启用限流（默认 True，设为 False 则跳过所有限流逻辑）
+        """
+        self.requests_per_minute = requests_per_minute
+        self.min_interval = min_interval
+        self.enabled = enabled
+
+        # 使用 deque 维护最近请求的时间戳（线程安全需要配合锁使用）
+        self._request_timestamps: deque = deque(maxlen=requests_per_minute)
+        self._lock = threading.Lock()  # 保护共享状态的锁
+        self._last_request_time: float = 0.0  # 最后一次请求的时间
+
+    def wait_if_needed(self) -> None:
+        """
+        如果需要，等待直到可以发送请求
+
+        检查逻辑：
+        1. 如果未启用，直接返回
+        2. 检查距离上次请求是否满足最小间隔
+        3. 检查最近 1 分钟内是否已达到请求上限
+        4. 如果需要等待，计算等待时间并 sleep
+        """
+        if not self.enabled:
+            return
+
+        with self._lock:
+            current_time = time.time()
+
+            # 清理超过 1 分钟的时间戳
+            one_minute_ago = current_time - 60.0
+            while self._request_timestamps and self._request_timestamps[0] < one_minute_ago:
+                self._request_timestamps.popleft()
+
+            # 检查是否达到每分钟请求上限
+            if len(self._request_timestamps) >= self.requests_per_minute:
+                # 需要等待到最早请求超过 1 分钟
+                oldest_request_time = self._request_timestamps[0]
+                wait_time = 60.0 - (current_time - oldest_request_time) + 0.5  # 额外 0.5 秒缓冲
+                if wait_time > 0:
+                    logger.info(
+                        f"[RateLimiter] 达到每分钟 {self.requests_per_minute} 次限制，等待 {wait_time:.1f} 秒..."
+                    )
+                    time.sleep(wait_time)
+                    current_time = time.time()  # 更新当前时间
+
+            # 检查是否满足最小间隔
+            if self._last_request_time > 0:
+                time_since_last = current_time - self._last_request_time
+                if time_since_last < self.min_interval:
+                    wait_time = self.min_interval - time_since_last
+                    logger.debug(
+                        f"[RateLimiter] 距离上次请求 {time_since_last:.1f} 秒，等待 {wait_time:.1f} 秒以满足最小间隔..."
+                    )
+                    time.sleep(wait_time)
+                    current_time = time.time()  # 更新当前时间
+
+    def record_request(self) -> None:
+        """
+        记录一次请求（在请求成功后调用）
+
+        将当前时间戳添加到请求历史中，用于后续的速率限制计算。
+        """
+        if not self.enabled:
+            return
+
+        with self._lock:
+            current_time = time.time()
+            self._request_timestamps.append(current_time)
+            self._last_request_time = current_time
+
+    def reset(self) -> None:
+        """重置限流器状态（清空请求历史）"""
+        with self._lock:
+            self._request_timestamps.clear()
+            self._last_request_time = 0.0
+
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        获取当前限流器统计信息
+
+        Returns:
+            包含统计信息的字典
+        """
+        with self._lock:
+            current_time = time.time()
+            one_minute_ago = current_time - 60.0
+
+            # 清理过期时间戳
+            valid_timestamps = [ts for ts in self._request_timestamps if ts >= one_minute_ago]
+
+            return {
+                "enabled": self.enabled,
+                "requests_per_minute": self.requests_per_minute,
+                "min_interval": self.min_interval,
+                "requests_in_last_minute": len(valid_timestamps),
+                "last_request_time": self._last_request_time,
+                "time_since_last_request": (
+                    current_time - self._last_request_time if self._last_request_time > 0 else None
+                ),
+            }
+
+
 class GeminiAnalyzer:
     """
     Gemini AI 分析器
@@ -89,6 +218,21 @@ class GeminiAnalyzer:
 
         # 初始化解析器
         self._parser = DashboardParser()
+
+        # 初始化速率限制器（可选，根据配置决定是否启用）
+        self._rate_limiter: Optional[RateLimiter] = None
+        if config.gemini_rate_limit_enabled:
+            self._rate_limiter = RateLimiter(
+                requests_per_minute=config.gemini_rate_limit_per_minute,
+                min_interval=config.gemini_rate_limit_min_interval,
+                enabled=True,
+            )
+            logger.info(
+                f"[RateLimiter] 已启用速率限制：每分钟最多 {config.gemini_rate_limit_per_minute} 次请求，"
+                f"最小间隔 {config.gemini_rate_limit_min_interval} 秒"
+            )
+        else:
+            logger.debug("[RateLimiter] 速率限制器未启用，使用原有的请求延迟机制")
 
         # 检查 Gemini API Key 是否有效（过滤占位符）
         gemini_key_valid = self._api_key and not self._api_key.startswith("your_") and len(self._api_key) > 10
@@ -263,6 +407,10 @@ class GeminiAnalyzer:
                     logger.info(f"[OpenAI] 第 {attempt + 1} 次重试，等待 {delay:.1f} 秒...")
                     time.sleep(delay)
 
+                # 使用速率限制器（如果启用，OpenAI API 也受限制）
+                if self._rate_limiter:
+                    self._rate_limiter.wait_if_needed()
+
                 response = self._openai_client.chat.completions.create(
                     model=self._current_model_name,
                     messages=[{"role": "system", "content": self.SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
@@ -271,6 +419,9 @@ class GeminiAnalyzer:
                 )
 
                 if response and response.choices and response.choices[0].message.content:
+                    # 请求成功后记录（用于速率限制）
+                    if self._rate_limiter:
+                        self._rate_limiter.record_request()
                     return response.choices[0].message.content
                 else:
                     raise ValueError("OpenAI API 返回空响应")
@@ -327,11 +478,18 @@ class GeminiAnalyzer:
                     logger.info(f"[Gemini] 第 {attempt + 1} 次重试，等待 {delay:.1f} 秒...")
                     time.sleep(delay)
 
+                # 使用速率限制器（如果启用）
+                if self._rate_limiter:
+                    self._rate_limiter.wait_if_needed()
+
                 response = self._model.generate_content(
                     prompt, generation_config=generation_config, request_options={"timeout": 120}
                 )
 
                 if response and response.text:
+                    # 请求成功后记录（用于速率限制）
+                    if self._rate_limiter:
+                        self._rate_limiter.record_request()
                     return response.text
                 else:
                     raise ValueError("Gemini 返回空响应")
