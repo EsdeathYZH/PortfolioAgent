@@ -389,22 +389,14 @@ class MarketAnalyzer:
                 "max_output_tokens": 2048,
             }
 
-            # 根据 analyzer 使用的 API 类型调用
-            if hasattr(self.analyzer, "_use_openai") and self.analyzer._use_openai:
-                # 使用 OpenAI 兼容 API
-                review = self.analyzer._call_openai_api(prompt, generation_config)
-            else:
-                # 使用 Gemini API
-                if hasattr(self.analyzer, "_model") and self.analyzer._model:
-                    response = self.analyzer._model.generate_content(
-                        prompt,
-                        generation_config=generation_config,
-                    )
-                    review = response.text.strip() if response and response.text else None
-                else:
-                    review = None
+            # 统一通过 _call_api_with_retry 调用，确保走限流和重试逻辑
+            # 注意：之前直接调用 self.analyzer._model.generate_content() 会绕过
+            #       RateLimiter，导致在个股分析刚结束后立即请求时触发 429 错误
+            review = self.analyzer._call_api_with_retry(prompt, generation_config)
 
             if review:
+                # 去除可能的首尾空白
+                review = review.strip()
                 logger.info(f"[大盘] 复盘报告生成成功，长度: {len(review)} 字符")
                 return review
             else:

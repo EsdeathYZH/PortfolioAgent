@@ -10,7 +10,6 @@ import logging
 # 导入依赖
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -656,7 +655,7 @@ class StockAnalysisPipeline:
         logger.info(f"===== 开始分析 {len(assets)} 个资产 =====")
         logger.info(f"股票: {stock_count} 只, 黄金: {gold_count} 个")
         logger.info(f"资产列表: {', '.join([f'{code}({atype})' for code, atype in assets])}")
-        logger.info(f"并发数: {self.max_workers}, 模式: {'仅获取数据' if dry_run else '完整分析'}")
+        logger.info(f"模式: {'仅获取数据' if dry_run else '串行分析（防止 Gemini API 429 限流）'}")
 
         # 单股推送模式（#55）：从配置读取
         single_stock_notify = getattr(self.config, "single_stock_notify", False)
@@ -665,37 +664,28 @@ class StockAnalysisPipeline:
 
         results: List[AnalysisResult] = []
 
-        # 使用线程池并发处理
-        # 注意：max_workers 设置较低（默认3）以避免触发反爬
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # 提交任务
-            future_to_asset = {}
-            for code, asset_type in assets:
+        # 串行处理每个资产（避免并发请求 Gemini API 触发 429 限流）
+        # 说明：多线程并发会导致多个请求同时通过 RateLimiter 检查后再一起发出，
+        #       即使配置了限流器也无法有效控制，因此改为严格串行执行。
+        for i, (code, asset_type) in enumerate(assets):
+            try:
+                logger.info(f"[{i+1}/{len(assets)}] 开始处理 {code}({asset_type})...")
                 if asset_type == "gold":
-                    future = executor.submit(
-                        self.process_gold,
+                    result = self.process_gold(
                         code,
                         skip_analysis=dry_run,
                         single_stock_notify=single_stock_notify and send_notification,
                     )
                 else:
-                    future = executor.submit(
-                        self.process_single_stock,
+                    result = self.process_single_stock(
                         code,
                         skip_analysis=dry_run,
                         single_stock_notify=single_stock_notify and send_notification,
                     )
-                future_to_asset[future] = (code, asset_type)
-
-            # 收集结果
-            for future in as_completed(future_to_asset):
-                code, asset_type = future_to_asset[future]
-                try:
-                    result = future.result()
-                    if result:
-                        results.append(result)
-                except Exception as e:
-                    logger.error(f"[{code}({asset_type})] 任务执行失败: {e}")
+                if result:
+                    results.append(result)
+            except Exception as e:
+                logger.error(f"[{code}({asset_type})] 任务执行失败: {e}")
 
         # 统计
         elapsed_time = time.time() - start_time
