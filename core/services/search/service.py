@@ -91,6 +91,8 @@ class SearchService:
         Returns:
             SearchResponse 对象
         """
+        has_custom_focus_keywords = focus_keywords is not None
+
         # 默认重点关注关键词（基于交易理念）
         if focus_keywords is None:
             focus_keywords = [
@@ -110,8 +112,16 @@ class SearchService:
             ]
 
         # 构建搜索查询（优化搜索效果）
-        # 主查询：股票名称 + 核心关键词
-        query = f"{stock_name} {stock_code} 股票 最新消息"
+        # 若外部显式传入 focus_keywords（如大盘复盘模块），优先使用调用方关键词
+        if has_custom_focus_keywords and focus_keywords:
+            keywords = [kw.strip() for kw in focus_keywords if kw and kw.strip()]
+            if keywords:
+                query = " ".join(keywords)
+            else:
+                query = f"{stock_name} {stock_code} 股票 最新消息"
+        else:
+            # 默认查询：股票名称 + 股票代码 + 泛化新闻词
+            query = f"{stock_name} {stock_code} 股票 最新消息"
 
         logger.info(f"搜索股票新闻: {stock_name}({stock_code})")
 

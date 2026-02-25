@@ -98,7 +98,7 @@ class PointGoldAnalysisPipeline:
         reason_parts: List[str] = []
 
         try:
-            df, source_name = self.fetcher_manager.get_daily_data(asset.code, days=260)
+            df, source_name = self.fetcher_manager.get_daily_data(asset.code, days=120)
             if df is not None and not df.empty:
                 close_series = df["close"].dropna()
                 if len(close_series) > 0:
