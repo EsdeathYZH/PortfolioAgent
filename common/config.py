@@ -121,8 +121,8 @@ class Config:
 
     # === 流控配置（防封禁关键参数）===
     # Akshare 请求间隔范围（秒）
-    akshare_sleep_min: float = 2.0
-    akshare_sleep_max: float = 5.0
+    akshare_sleep_min: float = 5.0
+    akshare_sleep_max: float = 10.0
 
     # Tushare 每分钟最大请求数（免费配额）
     tushare_rate_limit_per_minute: int = 80

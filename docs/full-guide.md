@@ -284,9 +284,11 @@ pip install -r requirements.txt
 ### 命令行参数
 
 ```bash
-python main.py                        # 完整分析（个股 + 大盘复盘）
-python main.py --market-review        # 仅大盘复盘
-python main.py --no-market-review     # 仅个股分析
+python main.py                        # full：完整分析（个股 + 商品 + 大盘 + 点金术）
+python main.py --stock-only           # stock-only：仅个股分析
+python main.py --commodity-only       # commodity-only：仅商品分析（黄金）
+python main.py --market-review        # market-only：仅大盘复盘
+python main.py --point-gold-only      # point-gold-only：仅点金术分析
 python main.py --stocks 600519,300750 # 指定股票
 python main.py --dry-run              # 仅获取数据，不 AI 分析
 python main.py --no-notify            # 不发送推送

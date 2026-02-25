@@ -108,14 +108,20 @@ PortfolioAgent/
 ### Command Line Options
 
 ```bash
-# Full analysis (stocks + market review)
+# Full analysis
 python main.py
 
-# Market review only
+# Mode: stock-only
+python main.py --stock-only
+
+# Mode: commodity-only (gold)
+python main.py --commodity-only
+
+# Mode: market-only
 python main.py --market-review
 
-# Stocks only (no market review)
-python main.py --no-market-review
+# Mode: point-gold-only
+python main.py --point-gold-only
 
 # Analyze specific stocks
 python main.py --stocks 600519,300750
@@ -305,7 +311,7 @@ Deploy PortfolioAgent for free on GitHub Actions (no server required):
 
 4. **Manual Test**
 
-   Go to `Actions` → `Run workflow` → Select mode → Run
+   Go to `Actions` → `Run workflow` → Select mode (`full` / `stock-only` / `commodity-only` / `market-only` / `point-gold-only`) → Run
 
 5. **Schedule**
 

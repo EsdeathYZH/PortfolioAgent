@@ -380,9 +380,11 @@ git push
 2. 选择 **"每日股票分析"** workflow
 3. 点击 **"Run workflow"** 按钮
 4. 选择运行模式：
-   - `full` - 完整分析（股票+大盘）
+   - `full` - 完整分析（个股+商品+大盘+点金术）
+   - `stock-only` - 仅个股分析
+   - `commodity-only` - 仅商品分析（黄金）
    - `market-only` - 仅大盘复盘
-   - `stocks-only` - 仅股票分析
+   - `point-gold-only` - 仅点金术分析
 5. 点击绿色 **"Run workflow"** 按钮
 
 #### 5. 查看执行日志

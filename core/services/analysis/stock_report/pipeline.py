@@ -730,7 +730,9 @@ class StockAnalysisPipeline:
             report = self.notifier.generate_dashboard_report(results)
 
             # 保存到本地
-            filepath = self.notifier.save_report_to_file(report)
+            date_str = date.today().strftime("%Y%m%d")
+            filename = f"stock_report_{date_str}_{self.user_config.username}.md"
+            filepath = self.notifier.save_report_to_file(report, filename=filename)
             logger.info(f"决策仪表盘日报已保存: {filepath}")
 
             # 跳过推送（单股推送模式）

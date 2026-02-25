@@ -16,6 +16,10 @@ def parse_arguments() -> argparse.Namespace:
         epilog="""
 示例:
   python main.py                    # 正常运行
+  python main.py --stock-only       # 仅个股分析
+  python main.py --commodity-only   # 仅商品分析（黄金）
+  python main.py --market-review    # 仅大盘复盘
+  python main.py --point-gold-only  # 仅点金术报告
   python main.py --debug            # 调试模式
   python main.py --dry-run          # 仅获取数据，不进行 AI 分析
   python main.py --stocks 600519,000001  # 指定分析特定股票
@@ -42,7 +46,9 @@ def parse_arguments() -> argparse.Namespace:
 
     parser.add_argument("--schedule", action="store_true", help="启用定时任务模式，每日定时执行")
 
-    parser.add_argument("--market-review", action="store_true", help="仅运行大盘复盘分析")
+    parser.add_argument("--market-review", action="store_true", help="仅运行大盘复盘分析（mode: market-only）")
+
+    parser.add_argument("--stock-only", action="store_true", help="仅运行个股分析（mode: stock-only）")
 
     parser.add_argument("--no-market-review", action="store_true", help="跳过大盘复盘分析")
 
@@ -52,7 +58,9 @@ def parse_arguments() -> argparse.Namespace:
         "--webui-only", action="store_true", help="仅启动 WebUI 服务，不自动执行分析（通过 /analysis API 手动触发）"
     )
 
-    parser.add_argument("--commodity-only", action="store_true", help="仅分析商品（黄金），跳过股票和大盘复盘")
+    parser.add_argument("--commodity-only", action="store_true", help="仅运行商品分析（黄金）（mode: commodity-only）")
+
+    parser.add_argument("--point-gold-only", action="store_true", help="仅运行点金术分析（mode: point-gold-only）")
 
     parser.add_argument(
         "--asset-type",

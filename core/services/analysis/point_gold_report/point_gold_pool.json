@@ -1,0 +1,41 @@
+{
+  "assets": [
+    {"name": "格力电器", "code": "000651", "group": "白电", "enabled": true},
+    {"name": "美的集团", "code": "000333", "group": "白电", "enabled": true},
+    {"name": "传音控股", "code": "688036", "group": "白电", "enabled": true},
+
+    {"name": "中国移动", "code": "600941", "group": "通信", "enabled": true},
+
+    {"name": "双汇发展", "code": "000895", "group": "食品饮料", "enabled": true},
+    {"name": "伊利股份", "code": "600887", "group": "食品饮料", "enabled": true},
+
+    {"name": "中国海油", "code": "600938", "group": "能源化工", "enabled": true},
+    {"name": "中国神华", "code": "601088", "group": "能源化工", "enabled": true},
+    {"name": "冀中能源", "code": "000937", "group": "能源化工", "enabled": true},
+    {"name": "云天化", "code": "600096", "group": "能源化工", "enabled": true},
+    {"name": "桐昆股份", "code": "601233", "group": "能源化工", "enabled": true},
+    {"name": "嘉化能源", "code": "600273", "group": "能源化工", "enabled": true},
+
+    {"name": "南山铝业", "code": "600219", "group": "金属有色", "enabled": true},
+
+    {"name": "温氏股份", "code": "300498", "group": "农林牧渔", "enabled": true},
+    {"name": "京基智农", "code": "000048", "group": "农林牧渔", "enabled": true},
+    {"name": "国光股份", "code": "002749", "group": "农林牧渔", "enabled": true},
+
+    {"name": "宁沪高速", "code": "600377", "group": "高速铁路", "enabled": true},
+    {"name": "皖通高速", "code": "600012", "group": "高速铁路", "enabled": true},
+    {"name": "中国中车", "code": "601766", "group": "高速铁路", "enabled": true},
+
+    {"name": "浙能电力", "code": "600023", "group": "电力", "enabled": true},
+
+    {"name": "中国平安", "code": "601318", "group": "金融", "enabled": true},
+    {"name": "江苏金租", "code": "600901", "group": "金融", "enabled": true},
+    {"name": "招商银行", "code": "600036", "group": "金融", "enabled": true},
+    {"name": "上海银行", "code": "601229", "group": "金融", "enabled": true},
+
+    {"name": "爱玛科技", "code": "603529", "group": "老朋友", "enabled": true},
+    {"name": "浦发银行", "code": "600000", "group": "老朋友", "enabled": true},
+    {"name": "思维列控", "code": "603508", "group": "老朋友", "enabled": true},
+    {"name": "嘉益股份", "code": "301004", "group": "老朋友", "enabled": true}
+  ]
+}

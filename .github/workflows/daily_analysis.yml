@@ -14,10 +14,11 @@ on:
         default: 'full'
         type: choice
         options:
-          - full              # 完整分析（股票+大盘+黄金）
-          - market-only       # 仅大盘复盘
-          - stocks-only       # 仅股票分析
+          - full              # 完整分析（个股+商品+大盘+点金术）
+          - stock-only        # 仅个股分析
           - commodity-only    # 仅商品分析（黄金）
+          - market-only       # 仅大盘复盘
+          - point-gold-only   # 仅点金术分析
 
 jobs:
   analyze:
@@ -123,10 +124,12 @@ jobs:
 
           if [ "$MODE" = "market-only" ]; then
             python main.py --market-review
-          elif [ "$MODE" = "stocks-only" ]; then
-            python main.py --no-market-review
+          elif [ "$MODE" = "stock-only" ]; then
+            python main.py --stock-only
           elif [ "$MODE" = "commodity-only" ]; then
-            python main.py --commodity-only --no-market-review
+            python main.py --commodity-only
+          elif [ "$MODE" = "point-gold-only" ]; then
+            python main.py --point-gold-only
           else
             python main.py
           fi

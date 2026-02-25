@@ -37,7 +37,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from common.config import Config, get_config
-from core.services.analysis import MarketAnalyzer, StockAnalysisPipeline
+from core.services.analysis import MarketAnalyzer, PointGoldAnalysisPipeline, StockAnalysisPipeline
 from core.services.notification import NotificationService
 from core.services.search import SearchService
 from core.services.user import UserConfigLoader
@@ -71,7 +71,8 @@ def run_market_review(notifier: NotificationService, analyzer=None, search_servi
         if review_report:
             # 保存报告到文件
             date_str = datetime.now().strftime("%Y%m%d")
-            report_filename = f"market_review_{date_str}.md"
+            username = getattr(getattr(notifier, "user_config", None), "username", "default")
+            report_filename = f"market_report_{date_str}_{username}.md"
             filepath = notifier.save_report_to_file(f"# 🎯 大盘复盘\n\n{review_report}", report_filename)
             logger.info(f"大盘复盘报告已保存: {filepath}")
 
@@ -94,7 +95,7 @@ def run_market_review(notifier: NotificationService, analyzer=None, search_servi
     return None
 
 
-def run_full_analysis(config: Config, args, stock_codes: Optional[List[str]] = None):
+def run_full_analysis(config: Config, args, stock_codes: Optional[List[str]] = None, mode: str = "full"):
     """
     执行完整的分析流程（多用户模式）
 
@@ -102,6 +103,7 @@ def run_full_analysis(config: Config, args, stock_codes: Optional[List[str]] = N
     遍历所有用户，为每个用户执行分析并发送通知
     """
     try:
+        logger.info(f"执行模式: {mode}")
         # 加载用户配置
         config_loader = UserConfigLoader()
         user_configs = config_loader.load_users()
@@ -123,35 +125,68 @@ def run_full_analysis(config: Config, args, stock_codes: Optional[List[str]] = N
                 logger.warning(f"用户 {user_config.username} 未配置订阅股票，跳过")
                 continue
 
-            # 创建分析流程（传入用户配置）
-            pipeline = StockAnalysisPipeline(config=config, max_workers=args.workers, user_config=user_config)
+            pipeline = None
+            point_gold_pipeline = None
+            user_notifier = NotificationService(user_config=user_config)
+            results = []
 
-            # 确定资产类型过滤
-            asset_type_filter = None
-            if getattr(args, "commodity_only", False):
-                asset_type_filter = "gold"
-            elif getattr(args, "asset_type", "all") != "all":
-                asset_type_filter = args.asset_type
+            # 1. 运行个股分析（full / stock-only / commodity-only）
+            if mode in {"full", "stock-only", "commodity-only"}:
+                pipeline = StockAnalysisPipeline(config=config, max_workers=args.workers, user_config=user_config)
+                user_notifier = pipeline.notifier
+                asset_type_filter = None
+                if mode == "stock-only":
+                    asset_type_filter = "stock"
+                elif mode == "commodity-only":
+                    asset_type_filter = "gold"
+                elif getattr(args, "asset_type", "all") != "all":
+                    asset_type_filter = args.asset_type
 
-            # 1. 运行个股分析（使用用户的股票列表）
-            user_stocks = stock_codes if stock_codes else user_config.stocks
-            results = pipeline.run(
-                stock_codes=user_stocks,
-                dry_run=args.dry_run,
-                send_notification=not args.no_notify,
-                asset_type_filter=asset_type_filter,
-            )
+                user_stocks = stock_codes if stock_codes else user_config.stocks
+                results = pipeline.run(
+                    stock_codes=user_stocks,
+                    dry_run=args.dry_run,
+                    send_notification=not args.no_notify,
+                    asset_type_filter=asset_type_filter,
+                )
 
             # 2. 运行大盘复盘（如果启用且不是仅个股模式）
             market_report = ""
-            if config.market_review_enabled and not args.no_market_review:
-                # 只调用一次，并获取结果
-                review_result = run_market_review(
-                    notifier=pipeline.notifier, analyzer=pipeline.analyzer, search_service=pipeline.search_service
-                )
+            if mode == "market-only" or (mode == "full" and config.market_review_enabled and not args.no_market_review):
+                if mode == "full" and pipeline is not None:
+                    review_result = run_market_review(
+                        notifier=pipeline.notifier, analyzer=pipeline.analyzer, search_service=pipeline.search_service
+                    )
+                else:
+                    search_service = None
+                    analyzer = None
+                    if config.bocha_api_keys or config.tavily_api_keys or config.serpapi_keys:
+                        search_service = SearchService(
+                            bocha_keys=config.bocha_api_keys,
+                            tavily_keys=config.tavily_api_keys,
+                            serpapi_keys=config.serpapi_keys,
+                        )
+                    if config.gemini_api_key:
+                        analyzer = GeminiAnalyzer(api_key=config.gemini_api_key)
+                    review_result = run_market_review(
+                        notifier=user_notifier, analyzer=analyzer, search_service=search_service
+                    )
                 # 如果有结果，赋值给 market_report 用于后续飞书文档生成
                 if review_result:
                     market_report = review_result
+
+            # 3. 运行点金术报告（full / point-gold-only）
+            if mode in {"full", "point-gold-only"}:
+                try:
+                    point_gold_pipeline = PointGoldAnalysisPipeline(config=config, user_config=user_config)
+                    logger.info(f"为用户 {user_config.username} 生成点金术报告...")
+                    grouped = point_gold_pipeline.run(send_notification=not args.no_notify)
+                    logger.info(
+                        f"点金术报告完成: 买入{len(grouped['buy_candidates'])} "
+                        f"卖出{len(grouped['sell_candidates'])} 观察{len(grouped['watch_list'])}"
+                    )
+                except Exception as e:
+                    logger.error(f"用户 {user_config.username} 点金术报告生成失败: {e}")
 
             # 输出摘要
             if results:
@@ -163,7 +198,10 @@ def run_full_analysis(config: Config, args, stock_codes: Optional[List[str]] = N
                         f"评分 {r.sentiment_score} | {r.trend_prediction}"
                     )
 
-            logger.info(f"用户 {user_config.username} 分析完成，共 {len(results)} 只股票")
+            if mode in {"full", "stock-only", "commodity-only"}:
+                logger.info(f"用户 {user_config.username} 分析完成，共 {len(results)} 只股票")
+            else:
+                logger.info(f"用户 {user_config.username} 分析完成（模式: {mode}）")
 
             # === 生成飞书云文档（如果用户配置了飞书渠道）===
             try:
@@ -185,7 +223,7 @@ def run_full_analysis(config: Config, args, stock_codes: Optional[List[str]] = N
 
                     # 添加个股决策仪表盘（使用 NotificationService 生成）
                     if results:
-                        dashboard_content = pipeline.notifier.generate_dashboard_report(results)
+                        dashboard_content = user_notifier.generate_dashboard_report(results)
                         full_content += f"# 🚀 个股决策仪表盘\n\n{dashboard_content}"
 
                     # 3. 创建文档
@@ -193,7 +231,7 @@ def run_full_analysis(config: Config, args, stock_codes: Optional[List[str]] = N
                     if doc_url:
                         logger.info(f"飞书云文档创建成功: {doc_url}")
                         # 可选：将文档链接也推送到用户的渠道
-                        pipeline.notifier.send(f"[{now.strftime('%Y-%m-%d %H:%M')}] 复盘文档创建成功: {doc_url}")
+                        user_notifier.send(f"[{now.strftime('%Y-%m-%d %H:%M')}] 复盘文档创建成功: {doc_url}")
 
             except Exception as e:
                 logger.error(f"用户 {user_config.username} 飞书文档生成失败: {e}")
@@ -265,49 +303,20 @@ def main() -> int:
         return 0
 
     try:
-        # 处理资产类型过滤参数
-        asset_type_filter = None
-        if getattr(args, "commodity_only", False):
-            asset_type_filter = "gold"
-            logger.info("模式: 仅商品分析（黄金）")
-        elif getattr(args, "asset_type", "all") != "all":
-            asset_type_filter = args.asset_type
-            logger.info(f"模式: 仅分析 {asset_type_filter} 类型资产")
+        # 统一模式路由（5种）
+        mode = "full"
+        if args.point_gold_only:
+            mode = "point-gold-only"
+        elif args.market_review:
+            mode = "market-only"
+        elif args.commodity_only:
+            mode = "commodity-only"
+        elif args.stock_only:
+            mode = "stock-only"
 
-        # 模式1: 仅大盘复盘
-        if args.market_review:
-            logger.info("模式: 仅大盘复盘")
+        logger.info(f"模式: {mode}")
 
-            # 加载用户配置，为每个用户发送大盘复盘
-            config_loader = UserConfigLoader()
-            user_configs = config_loader.load_users()
-
-            if not user_configs:
-                raise ValueError("未配置用户，请在环境变量中设置 USERS 和 USER_<username>_* 配置")
-
-            # 初始化搜索服务和分析器（如果有配置）
-            search_service = None
-            analyzer = None
-
-            if config.bocha_api_keys or config.tavily_api_keys or config.serpapi_keys:
-                search_service = SearchService(
-                    bocha_keys=config.bocha_api_keys,
-                    tavily_keys=config.tavily_api_keys,
-                    serpapi_keys=config.serpapi_keys,
-                )
-
-            if config.gemini_api_key:
-                analyzer = GeminiAnalyzer(api_key=config.gemini_api_key)
-
-            # 为每个用户执行大盘复盘
-            for user_config in user_configs:
-                logger.info(f"为用户 {user_config.username} 执行大盘复盘...")
-                notifier = NotificationService(user_config=user_config)
-                run_market_review(notifier, analyzer, search_service)
-
-            return 0
-
-        # 模式2: 定时任务模式
+        # 模式1: 定时任务模式
         if args.schedule or config.schedule_enabled:
             logger.info("模式: 定时任务")
             logger.info(f"每日执行时间: {config.schedule_time}")
@@ -315,15 +324,15 @@ def main() -> int:
             from presentation.scheduler import run_with_schedule
 
             def scheduled_task():
-                run_full_analysis(config, args, stock_codes)
+                run_full_analysis(config, args, stock_codes, mode=mode)
 
             run_with_schedule(
                 task=scheduled_task, schedule_time=config.schedule_time, run_immediately=True  # 启动时先执行一次
             )
             return 0
 
-        # 模式3: 正常单次运行
-        run_full_analysis(config, args, stock_codes)
+        # 模式2: 正常单次运行
+        run_full_analysis(config, args, stock_codes, mode=mode)
 
         logger.info("\n程序执行完成")
 
